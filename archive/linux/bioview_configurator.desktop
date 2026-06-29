@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=BioView Monitor
+Comment=Open Configurator for BioView compatible hardware
+Exec=/usr/bin/bioview/monitor %f
+Type=Application
+Categories=Development;Engineering;
+Icon=utilities-terminal 

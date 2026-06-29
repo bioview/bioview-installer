@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=BioView Monitor
+Comment=Open data acquisition software for cross-platform device control
+Exec=bioview %f
+Icon=org.bioview.BioView
+Terminal=false
+Type=Application
+Categories=Science;Engineering;Utility;
+MimeType=application/x-bview;
+StartupNotify=true

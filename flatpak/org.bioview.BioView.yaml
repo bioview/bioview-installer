@@ -1,0 +1,118 @@
+# Flatpak manifest for BioView (Linux).
+#
+# Hybrid UHD: unlike the macOS/Windows bundles (which reuse a prebuilt UHD), the
+# Flatpak builds UHD -- and its Boost/libusb dependencies -- from source inside
+# the sandbox with the Python API enabled, so the resulting bundle is fully
+# self-contained (libuhd + bindings + FPGA images all live under /app).
+#
+# The bioview-client package exposes a `bioview` console script (its launcher),
+# which pip installs to /app/bin/bioview -- that is the app command.
+#
+# Build:   flatpak-builder --force-clean --user --install-deps-from=flathub \
+#              build/flatpak org.bioview.BioView.yaml
+# Bundle:  flatpak build-bundle <repo> BioView.flatpak org.bioview.BioView
+
+app-id: org.bioview.BioView
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: bioview
+
+finish-args:
+  - --share=ipc
+  - --share=network            # localhost + LAN server/client sockets
+  - --socket=x11
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=all               # USB access for USRP devices
+  - --filesystem=home          # user-chosen recording directories
+
+# Allow network access during the build so pip/cmake/b2 can fetch what they need.
+build-options:
+  build-args:
+    - --share=network
+
+modules:
+  # --- libusb (USB backend for UHD) ------------------------------------------
+  - name: libusb
+    buildsystem: autotools
+    sources:
+      - type: git
+        url: https://github.com/libusb/libusb.git
+        tag: v1.0.27
+
+  # --- Boost (UHD build/runtime dependency) ----------------------------------
+  - name: boost
+    buildsystem: simple
+    build-commands:
+      - ./bootstrap.sh --prefix=/app --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,unit_test_framework
+      - ./b2 -j ${FLATPAK_BUILDER_N_JOBS} install
+    sources:
+      - type: git
+        url: https://github.com/boostorg/boost.git
+        tag: boost-1.83.0
+
+  # --- Python build helpers needed to compile the UHD Python API -------------
+  - name: uhd-build-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app mako numpy setuptools wheel
+
+  # --- UHD with Python bindings + FPGA images --------------------------------
+  - name: uhd
+    buildsystem: cmake-ninja
+    subdir: host
+    config-opts:
+      - -DENABLE_PYTHON_API=ON
+      - -DENABLE_TESTS=OFF
+      - -DENABLE_MANUAL=OFF
+      - -DENABLE_DOXYGEN=OFF
+      - -DENABLE_EXAMPLES=OFF
+      - -DPYTHON_EXECUTABLE=/usr/bin/python3
+      - -DCMAKE_INSTALL_PREFIX=/app
+    post-install:
+      # Bundle the FPGA/firmware images so USRPs work with no external download.
+      # UHD looks in <prefix>/share/uhd/images by default.
+      - /app/bin/uhd_images_downloader || true
+    sources:
+      - type: git
+        url: https://github.com/EttusResearch/uhd.git
+        tag: v4.6.0.0
+
+  # --- BioView Python/Qt runtime dependencies --------------------------------
+  - name: python-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app
+          PyQt6 pyqtgraph qtawesome pyqtdarktheme2 darkdetect
+          numpy scipy h5py pygame
+
+  # --- The three BioView packages + desktop integration ----------------------
+  - name: bioview
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-deps ./bioview-common
+      - pip3 install --prefix=/app --no-deps ./bioview-server
+      - pip3 install --prefix=/app --no-deps ./bioview-client
+      - install -Dm644 org.bioview.BioView.desktop /app/share/applications/org.bioview.BioView.desktop
+      - install -Dm644 org.bioview.BioView.metainfo.xml /app/share/metainfo/org.bioview.BioView.metainfo.xml
+      - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/org.bioview.BioView.png
+    sources:
+      - type: git
+        url: https://github.com/bioview/bioview-common.git
+        tag: v0.9.3
+        dest: bioview-common
+      - type: git
+        url: https://github.com/bioview/bioview-server.git
+        tag: v0.9.3
+        dest: bioview-server
+      - type: git
+        url: https://github.com/bioview/bioview-client.git
+        tag: v0.9.3
+        dest: bioview-client
+      - type: file
+        path: org.bioview.BioView.desktop
+      - type: file
+        path: org.bioview.BioView.metainfo.xml
+      - type: file
+        path: ../assets/icon.png

@@ -1,0 +1,53 @@
+# Single source of truth for every BioView installer build (Flatpak / Windows / macOS).
+# Read by scripts/buildcfg.py so the shell and PowerShell builders share one config.
+
+[app]
+name = "BioView"
+app_id = "org.bioview.BioView"
+version = "0.9.3"
+description = "Open data acquisition software for cross-platform device control"
+license = "GPL-3.0-or-later"
+publisher = "BioView"
+maintainer = "Aakash Kapoor <ak2247@cornell.edu>"
+homepage = "https://github.com/bioview"
+
+[entry]
+# The frozen binary name and the launcher it dispatches to. The launcher decides,
+# via --role, whether to start the hidden server, the Monitor GUI, or Configurator.
+binary = "BioView"
+module = "bioview_client.launch"
+func = "main"
+
+[uhd]
+# Hybrid UHD delivery: this single version is obtained per-platform at build time
+# (pip wheel on Windows, Homebrew on macOS, built from source in the Flatpak).
+version = "4.6.0.0"
+# Git ref used for the Flatpak source build of UHD.
+git = "https://github.com/EttusResearch/uhd.git"
+ref = "v4.6.0.0"
+
+# BioView is three separate packages. The builders prefer a local sibling checkout
+# (great for development from this monorepo) and fall back to a shallow git clone
+# of the pinned ref when the local path is absent (e.g. clean CI runners).
+[[packages]]
+name = "bioview-common"
+git = "https://github.com/bioview/bioview-common.git"
+ref = "v0.9.3"
+local = "../bioview-common"
+
+[[packages]]
+name = "bioview-server"
+git = "https://github.com/bioview/bioview-server.git"
+ref = "v0.9.3"
+local = "../bioview-server"
+
+[[packages]]
+name = "bioview-client"
+git = "https://github.com/bioview/bioview-client.git"
+ref = "v0.9.3"
+local = "../bioview-client"
+
+[assets]
+icon_icns = "assets/icon.icns"
+icon_ico = "assets/icon.ico"
+icon_png = "assets/icon.png"

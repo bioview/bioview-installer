@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.bioview.BioView</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>BioView</name>
+  <summary>Open data acquisition software for cross-platform device control</summary>
+  <description>
+    <p>
+      BioView is a cross-platform, networked data acquisition system. The Monitor
+      GUI connects to a BioView server (started automatically on localhost) to
+      discover devices, stream data in real time, and record sessions. USRP
+      (UHD) devices are supported out of the box.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.bioview.BioView.desktop</launchable>
+  <provides>
+    <binary>bioview</binary>
+  </provides>
+  <categories>
+    <category>Science</category>
+    <category>Engineering</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.9.3" date="2026-06-28"/>
+  </releases>
+</component>

@@ -1,0 +1,99 @@
+name: Build BioView Installers
+
+# Builds the three packaging targets on their native OS and attaches them to the
+# GitHub Release. Each builder pulls the three BioView packages (and UHD) per the
+# hybrid strategy described in build.toml / the README.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-flatpak:
+    name: Linux (Flatpak)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+
+      - name: Build Flatpak bundle
+        working-directory: flatpak
+        run: |
+          mkdir -p ../dist
+          flatpak-builder --user --force-clean --repo=repo build org.bioview.BioView.yaml
+          flatpak build-bundle repo ../dist/BioView.flatpak org.bioview.BioView
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bioview-flatpak
+          path: dist/*.flatpak
+
+  macos:
+    name: macOS (.dmg)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14   # Apple Silicon (arm64)
+          - runner: macos-13   # Intel (x86_64)
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install UHD (Homebrew)
+        run: brew install uhd
+
+      - name: Build .app + .dmg
+        run: bash scripts/build_macos.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bioview-dmg-${{ matrix.runner }}
+          path: dist/*.dmg
+
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build installer
+        shell: pwsh
+        run: ./scripts/build_windows.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bioview-windows
+          path: dist/*.exe
+
+  release:
+    name: Attach to GitHub Release
+    needs: [linux-flatpak, macos, windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
