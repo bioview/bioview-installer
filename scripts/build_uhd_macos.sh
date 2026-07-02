@@ -27,18 +27,27 @@ NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 # UHD 4.6 expects classic Boost component packages (e.g. boost_system). Homebrew
 # ships Boost 1.90 where system is header-only and no boost_systemConfig.cmake exists.
-# Build the same Boost 1.83 tree used by the Flatpak manifest.
+# Build Boost 1.83 from the official release tarball (the git meta-repo needs
+# submodules; a shallow clone is missing tools/build and bootstrap fails).
+BOOST_VERSION="1.83.0"
+BOOST_TARBALL="$BUILD_DIR/boost_1_83_0.tar.bz2"
+BOOST_SRC="$BUILD_DIR/boost_1_83_0"
+
 ensure_boost() {
     if [ -f "$BOOST_PREFIX/lib/cmake/Boost-1.83.0/BoostConfig.cmake" ]; then
         echo "=== Using cached Boost 1.83 at $BOOST_PREFIX ==="
         return
     fi
-    local boost_src="$BUILD_DIR/boost-src"
-    rm -rf "$boost_src"
-    echo "=== Building Boost 1.83.0 ==="
-    git clone --depth 1 --branch boost-1.83.0 https://github.com/boostorg/boost.git "$boost_src"
+    echo "=== Building Boost $BOOST_VERSION ==="
+    if [ ! -f "$BOOST_TARBALL" ]; then
+        curl -fsSL "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_1_83_0.tar.bz2" \
+            -o "$BOOST_TARBALL"
+    fi
+    if [ ! -d "$BOOST_SRC" ]; then
+        tar -xjf "$BOOST_TARBALL" -C "$BUILD_DIR"
+    fi
     (
-        cd "$boost_src"
+        cd "$BOOST_SRC"
         ./bootstrap.sh --prefix="$BOOST_PREFIX" \
             --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,test
         ./b2 -j "$NPROC" install
