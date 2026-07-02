@@ -5,11 +5,11 @@
 # python@3.x UHD currently depends on (often 3.14), which is outside BioView's
 # tested range. Building from source against python@3.13/3.12 is the reliable path.
 #
-# Usage: build_uhd_macos.sh <python_bin> <build_dir>
+# Usage: build_uhd_macos.sh <venv_python> <build_dir>
 # Writes <build_dir>/uhd-prefix.path with the install prefix.
 set -euo pipefail
 
-PYTHON_BIN="${1:?python interpreter required}"
+PYTHON_BIN="${1:?venv python interpreter required}"
 BUILD_DIR="${2:?build dir required}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,22 +20,39 @@ UHD_REF="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.ref)"
 UHD_SRC="$BUILD_DIR/uhd-src"
 UHD_PREFIX="$BUILD_DIR/uhd-prefix"
 BOOST_PREFIX="$BUILD_DIR/boost-prefix"
-rm -rf "$UHD_SRC" "$UHD_PREFIX"
-mkdir -p "$UHD_SRC" "$UHD_PREFIX"
-
-NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
-
-# UHD 4.6 expects classic Boost component packages (e.g. boost_system). Homebrew
-# ships Boost 1.90 where system is header-only and no boost_systemConfig.cmake exists.
-# Build Boost 1.83 from the official release tarball (the git meta-repo needs
-# submodules; a shallow clone is missing tools/build and bootstrap fails).
 BOOST_VERSION="1.83.0"
 BOOST_TARBALL="$BUILD_DIR/boost_1_83_0.tar.bz2"
 BOOST_SRC="$BUILD_DIR/boost_1_83_0"
 
+NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+
+# Homebrew CMake 3.31+ breaks UHD 4.6 (FindBoost spelling, old cmake_minimum_required in
+# CMakeRC.cmake, removed <3.5 compat). Use a pinned CMake from the build venv instead.
+resolve_cmake() {
+    local cmake_bin
+    cmake_bin="$(dirname "$PYTHON_BIN")/cmake"
+    if [ ! -x "$cmake_bin" ]; then
+        echo "ERROR: pinned cmake not found at $cmake_bin" >&2
+        echo "       prepare_env.sh must run: pip install 'cmake>=3.22,<3.31'" >&2
+        exit 1
+    fi
+    local ver
+    ver="$("$cmake_bin" --version | awk '/version/ {print $3}')"
+    case "$ver" in
+        3.3[1-9]*|3.[4-9]*|4.*)
+            echo "ERROR: cmake $ver is too new for UHD 4.6 (need >=3.22, <3.31)" >&2
+            exit 1
+            ;;
+    esac
+    echo "$cmake_bin"
+}
+
+# UHD 4.6 expects classic Boost component packages (e.g. boost_system). Homebrew
+# ships Boost 1.90 where system is header-only. Use the official 1.83 tarball (the git
+# meta-repo needs submodules; a shallow clone is missing tools/build).
 ensure_boost() {
     if [ -f "$BOOST_PREFIX/lib/cmake/Boost-1.83.0/BoostConfig.cmake" ]; then
-        echo "=== Using cached Boost 1.83 at $BOOST_PREFIX ==="
+        echo "=== Using cached Boost $BOOST_VERSION at $BOOST_PREFIX ==="
         return
     fi
     echo "=== Building Boost $BOOST_VERSION ==="
@@ -52,7 +69,55 @@ ensure_boost() {
             --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,test
         ./b2 -j "$NPROC" install
     )
+    if [ ! -f "$BOOST_PREFIX/lib/cmake/Boost-1.83.0/BoostConfig.cmake" ]; then
+        echo "ERROR: Boost install did not produce BoostConfig.cmake" >&2
+        exit 1
+    fi
 }
+
+uhd_library_path() {
+    printf '%s' "$UHD_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+}
+
+verify_uhd_import() {
+    DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd; print(uhd.__file__)"
+}
+
+install_uhd_python_fallback() {
+    # When cmake detects a venv it runs setup.py install; otherwise it copies into
+    # $UHD_PREFIX. This fallback covers the non-venv layout.
+    local pytag venv_site installed=0 candidate found
+    pytag="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    venv_site="$("$PYTHON_BIN" -c 'import site; print(site.getsitepackages()[0])')"
+    for candidate in \
+        "$UHD_PREFIX/lib/python$pytag/site-packages/uhd" \
+        "$UHD_PREFIX/lib/python$pytag/dist-packages/uhd"; do
+        if [ -d "$candidate" ]; then
+            echo "=== Copying UHD python package from $candidate ==="
+            rsync -a "$candidate" "$venv_site/"
+            installed=1
+            break
+        fi
+    done
+    if [ "$installed" = "0" ]; then
+        found="$(find "$UHD_PREFIX" -type d -name uhd -path '*/site-packages/*' 2>/dev/null | head -1 || true)"
+        if [ -n "$found" ]; then
+            echo "=== Copying UHD python package from $found ==="
+            rsync -a "$found" "$venv_site/"
+            installed=1
+        fi
+    fi
+    if [ "$installed" = "0" ]; then
+        echo "ERROR: could not locate UHD python package under $UHD_PREFIX" >&2
+        find "$UHD_PREFIX" -maxdepth 5 -type d -name uhd 2>/dev/null || true
+        exit 1
+    fi
+}
+
+CMAKE_BIN="$(resolve_cmake)"
+
+rm -rf "$UHD_SRC" "$UHD_PREFIX"
+mkdir -p "$UHD_SRC" "$UHD_PREFIX"
 
 ensure_boost
 
@@ -62,8 +127,8 @@ git clone --depth 1 --branch "$UHD_REF" "$UHD_GIT" "$UHD_SRC"
 LIBUSB_PREFIX="$(brew --prefix libusb)"
 CMAKE_PREFIX_PATH="$BOOST_PREFIX:$LIBUSB_PREFIX"
 
-echo "=== Configuring UHD (Python API) ==="
-cmake -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
+echo "=== Configuring UHD (Python API) with $("$CMAKE_BIN" --version | head -1) ==="
+"$CMAKE_BIN" -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$UHD_PREFIX" \
     -DENABLE_PYTHON_API=ON \
@@ -75,44 +140,30 @@ cmake -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
     -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
     -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
     -DBOOST_ROOT="$BOOST_PREFIX" \
-    -DBOOST_NO_SYSTEM_PATHS=ON
+    -DBOOST_NO_SYSTEM_PATHS=ON \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+    -Wno-dev
 
 echo "=== Building UHD (-j $NPROC) ==="
-cmake --build "$UHD_SRC/host/build" -j "$NPROC"
-cmake --install "$UHD_SRC/host/build"
+"$CMAKE_BIN" --build "$UHD_SRC/host/build" -j "$NPROC"
+"$CMAKE_BIN" --install "$UHD_SRC/host/build"
 
-echo "=== Installing UHD Python bindings into venv ==="
-VENV_SITE="$("$PYTHON_BIN" -c 'import site; print(site.getsitepackages()[0])')"
-PYTAG="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-INSTALLED=0
-for candidate in \
-    "$UHD_PREFIX/lib/python$PYTAG/site-packages/uhd" \
-    "$UHD_PREFIX/lib/python$PYTAG/dist-packages/uhd"; do
-    if [ -d "$candidate" ]; then
-        cp -R "$candidate" "$VENV_SITE/"
-        INSTALLED=1
-        break
-    fi
-done
-if [ "$INSTALLED" = "0" ]; then
-    FOUND="$(find "$UHD_PREFIX" -type d -name uhd -path '*/site-packages/*' 2>/dev/null | head -1 || true)"
-    if [ -n "$FOUND" ]; then
-        cp -R "$FOUND" "$VENV_SITE/"
-        INSTALLED=1
-    fi
-fi
-if [ "$INSTALLED" = "0" ]; then
-    echo "ERROR: could not locate UHD python package under $UHD_PREFIX" >&2
+if [ ! -f "$UHD_PREFIX/lib/libuhd.dylib" ]; then
+    echo "ERROR: libuhd.dylib not found under $UHD_PREFIX/lib" >&2
+    ls -la "$UHD_PREFIX/lib" 2>/dev/null || true
     exit 1
 fi
 
-if ! "$PYTHON_BIN" -c "import uhd" >/dev/null 2>&1; then
-    echo "ERROR: UHD python module not importable after install" >&2
-    exit 1
+echo "=== Verifying UHD Python bindings ==="
+if ! verify_uhd_import 2>/dev/null; then
+    echo "=== Import failed; trying manual python package install ==="
+    install_uhd_python_fallback
+    verify_uhd_import
 fi
 
 echo "=== Downloading UHD FPGA/firmware images ==="
-"$UHD_PREFIX/bin/uhd_images_downloader" || echo "WARNING: uhd_images_downloader failed"
+DYLD_LIBRARY_PATH="$(uhd_library_path)" "$UHD_PREFIX/bin/uhd_images_downloader" \
+    || echo "WARNING: uhd_images_downloader failed (USRP may need manual image download)"
 
 printf '%s\n' "$UHD_PREFIX" > "$BUILD_DIR/uhd-prefix.path"
 echo "=== UHD ready at $UHD_PREFIX ==="

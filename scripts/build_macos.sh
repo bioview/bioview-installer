@@ -36,8 +36,21 @@ select_supported_python() {
     exit 1
 }
 
-# --- 1. Build toolchain (Boost/libusb for UHD source build) ---------------
-for formula in python@3.13 cmake libusb ninja pkg-config; do
+preflight() {
+  local icon_path="$INSTALLER_DIR/$(python3 "$HERE/buildcfg.py" get assets.icon_icns)"
+  if [ ! -f "$icon_path" ]; then
+    echo "ERROR: app icon missing: $icon_path" >&2
+    exit 1
+  fi
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "ERROR: Homebrew is required for the macOS build" >&2
+    exit 1
+  fi
+}
+
+# --- 1. Native build deps (not cmake/boost — those are pinned/built in-tree) -
+preflight
+for formula in python@3.13 libusb ninja pkg-config; do
     if ! brew list "$formula" >/dev/null 2>&1; then
         echo "=== Installing $formula via Homebrew ==="
         brew install "$formula"
@@ -66,6 +79,8 @@ fi
 UHD_PREFIX="$(cat "$BUILD_DIR/uhd-prefix.path")"
 echo "UHD prefix: $UHD_PREFIX"
 
+export DYLD_LIBRARY_PATH="$UHD_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+
 # --- 3. PyInstaller -------------------------------------------------------
 ICON_ARG=()
 ICON_PATH="$INSTALLER_DIR/$(python3 "$HERE/buildcfg.py" get assets.icon_icns)"
@@ -77,10 +92,7 @@ ADD_BINARY=()
 ADD_DATA=()
 [ -d "$UHD_PREFIX/share/uhd" ] && ADD_DATA=(--add-data "$UHD_PREFIX/share/uhd:share/uhd")
 
-UHD_COLLECT=()
-if python -c "import uhd" >/dev/null 2>&1; then
-    UHD_COLLECT=(--collect-all uhd)
-else
+if ! python -c "import uhd" >/dev/null 2>&1; then
     echo "ERROR: uhd python module not importable after source build" >&2
     exit 1
 fi
@@ -92,8 +104,11 @@ pyinstaller --noconfirm --clean --windowed \
     --workpath "$BUILD_DIR/pyinstaller_work" \
     --specpath "$BUILD_DIR" \
     ${ICON_ARG[@]+"${ICON_ARG[@]}"} \
-    ${UHD_COLLECT[@]+"${UHD_COLLECT[@]}"} \
+    --collect-all uhd \
     --collect-all pyqtgraph \
+    --collect-all scipy \
+    --collect-all h5py \
+    --collect-all pygame \
     --collect-submodules bioview_common \
     --collect-submodules bioview_server \
     --collect-submodules bioview_client \

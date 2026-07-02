@@ -40,6 +40,7 @@ jobs:
 
   macos:
     name: macOS (.dmg)
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -50,11 +51,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # macOS: build UHD from source against python@3.13 (no PyPI wheel; Homebrew
-      # bindings target an unsupported python@3.x).
+      - name: Cache Boost 1.83 build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/macos/boost_1_83_0.tar.bz2
+            build/macos/boost_1_83_0
+            build/macos/boost-prefix
+          key: boost-1.83.0-${{ matrix.runner }}
+
+      # macOS: build UHD from source against python@3.13 (no PyPI wheel).
+      # CMake comes from pip (pinned <3.31); Boost 1.83 is built from tarball.
       - name: Install build dependencies (Homebrew)
         run: |
-          brew install python@3.13 cmake libusb ninja pkg-config
+          brew install python@3.13 libusb ninja pkg-config
 
       - name: Build .app + .dmg
         run: |
