@@ -83,33 +83,42 @@ verify_uhd_import() {
     DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd; print(uhd.__file__)"
 }
 
-install_uhd_python_fallback() {
-    # When cmake detects a venv it runs setup.py install; otherwise it copies into
-    # $UHD_PREFIX. This fallback covers the non-venv layout.
-    local pytag venv_site installed=0 candidate found
-    pytag="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+install_uhd_python_bindings() {
+    # UHD detects the venv and runs `setup.py install` from cmake --install, but that
+    # often fails silently on Python 3.13 (deprecated install path). The compiled module
+    # always lands in the CMake build tree; install it with pip instead.
+    local py_build="$UHD_SRC/host/build/python"
+    local setup_py="$py_build/setup.py"
+    local venv_site
     venv_site="$("$PYTHON_BIN" -c 'import site; print(site.getsitepackages()[0])')"
-    for candidate in \
-        "$UHD_PREFIX/lib/python$pytag/site-packages/uhd" \
-        "$UHD_PREFIX/lib/python$pytag/dist-packages/uhd"; do
-        if [ -d "$candidate" ]; then
-            echo "=== Copying UHD python package from $candidate ==="
-            rsync -a "$candidate" "$venv_site/"
-            installed=1
-            break
-        fi
-    done
-    if [ "$installed" = "0" ]; then
-        found="$(find "$UHD_PREFIX" -type d -name uhd -path '*/site-packages/*' 2>/dev/null | head -1 || true)"
-        if [ -n "$found" ]; then
-            echo "=== Copying UHD python package from $found ==="
-            rsync -a "$found" "$venv_site/"
-            installed=1
-        fi
+
+    if [ ! -f "$setup_py" ]; then
+        echo "ERROR: missing $setup_py after UHD build" >&2
+        find "$UHD_SRC/host/build" -name setup.py 2>/dev/null || true
+        exit 1
     fi
-    if [ "$installed" = "0" ]; then
-        echo "ERROR: could not locate UHD python package under $UHD_PREFIX" >&2
-        find "$UHD_PREFIX" -maxdepth 5 -type d -name uhd 2>/dev/null || true
+    if [ ! -d "$py_build/uhd" ]; then
+        echo "ERROR: missing built python package at $py_build/uhd" >&2
+        ls -la "$py_build" 2>/dev/null || true
+        exit 1
+    fi
+
+    echo "=== Installing UHD python bindings via pip ==="
+    if ! DYLD_LIBRARY_PATH="$(uhd_library_path)" \
+        "$PYTHON_BIN" -m pip install --no-build-isolation --force-reinstall "$py_build"; then
+        echo "=== pip install failed; copying build tree into venv ==="
+        rm -rf "$venv_site/uhd"
+        mkdir -p "$venv_site/uhd"
+        rsync -a "$py_build/uhd/" "$venv_site/uhd/"
+    fi
+
+    if [ ! -d "$venv_site/uhd" ]; then
+        echo "ERROR: uhd package not present under $venv_site" >&2
+        exit 1
+    fi
+    if ! find "$venv_site/uhd" -name '*.so' -print -quit | grep -q .; then
+        echo "ERROR: no pyuhd extension module under $venv_site/uhd" >&2
+        ls -la "$venv_site/uhd" 2>/dev/null || true
         exit 1
     fi
 }
@@ -155,10 +164,13 @@ if [ ! -f "$UHD_PREFIX/lib/libuhd.dylib" ]; then
 fi
 
 echo "=== Verifying UHD Python bindings ==="
-if ! verify_uhd_import 2>/dev/null; then
-    echo "=== Import failed; trying manual python package install ==="
-    install_uhd_python_fallback
-    verify_uhd_import
+install_uhd_python_bindings
+if ! verify_uhd_import; then
+    echo "ERROR: uhd import failed after install" >&2
+    "$PYTHON_BIN" -c "import sys, site; print('prefix', sys.prefix); print('site', site.getsitepackages())"
+    find "$("$PYTHON_BIN" -c 'import site; print(site.getsitepackages()[0])')/uhd" -maxdepth 2 -type f 2>/dev/null || true
+    DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd" 2>&1 || true
+    exit 1
 fi
 
 echo "=== Downloading UHD FPGA/firmware images ==="

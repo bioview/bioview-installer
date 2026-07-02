@@ -55,7 +55,7 @@ pip install "$SRC_DIR/bioview-client"
 
 if [ "${WITH_UHD_SOURCE:-0}" = "1" ]; then
     echo "=== Preparing UHD build deps (pinned cmake + python modules) ==="
-    pip install "cmake>=3.22,<3.31" mako numpy
+    pip install "cmake>=3.22,<3.31" setuptools wheel mako numpy
     "$HERE/build_uhd_macos.sh" "$VENV/bin/python" "$BUILD_DIR"
 elif [ "${WITH_UHD_PIP:-0}" = "1" ]; then
     UHD_VERSION="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.version)"
