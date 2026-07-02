@@ -43,6 +43,7 @@ Write-Host "=== Running PyInstaller ===" -ForegroundColor Cyan
     --collect-submodules bioview_common `
     --collect-submodules bioview_server `
     --collect-submodules bioview_client `
+    --collect-data bioview_client `
     "$Here\pyinstaller_entry.py"
 
 $AppDir = Join-Path $PyiDist $AppName
@@ -52,6 +53,11 @@ if (-not (Test-Path $AppDir)) { Write-Error "PyInstaller output not found: $AppD
 $Inno = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $Inno)) { Write-Error "Inno Setup not found at $Inno" }
 
+# The installer bundle icon uses the wordmark variant (favicon_text.svg).
+$InstallerIcon = Join-Path $InstallerDir ((& $PythonBin "$Here\buildcfg.py" get assets.installer_ico).Trim())
+$InstallerIconDefine = @()
+if (Test-Path $InstallerIcon) { $InstallerIconDefine = @("/DSetupIconFile=$InstallerIcon") }
+
 Write-Host "=== Building installer with Inno Setup ===" -ForegroundColor Cyan
 & $Inno `
     "/DMyAppName=$AppName" `
@@ -60,6 +66,7 @@ Write-Host "=== Building installer with Inno Setup ===" -ForegroundColor Cyan
     "/DMyAppExeName=$AppName.exe" `
     "/DSourceDir=$AppDir" `
     "/DOutputDir=$DistDir" `
+    @InstallerIconDefine `
     "$InstallerDir\windows\setup.iss"
 
 Write-Host "=== SUCCESS: $DistDir\$AppName-$AppVersion-Setup.exe ===" -ForegroundColor Green

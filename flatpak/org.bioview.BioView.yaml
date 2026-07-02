@@ -12,9 +12,12 @@
 #              build/flatpak org.bioview.BioView.yaml
 # Bundle:  flatpak build-bundle <repo> BioView.flatpak org.bioview.BioView
 
+# Freedesktop runtime 24.08 ships Python 3.12, which satisfies every BioView
+# package's requires-python (>=3.12, <3.14). The older 23.08 runtime shipped
+# Python 3.11 and so failed to install the packages.
 app-id: org.bioview.BioView
 runtime: org.freedesktop.Platform
-runtime-version: '23.08'
+runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
 command: bioview
 
@@ -83,8 +86,12 @@ modules:
   - name: python-deps
     buildsystem: simple
     build-commands:
+      # Pin the Qt stack to the same versions BioView is tested against (matches
+      # bioview-client's constraints) so the Flatpak builds a known-good combo.
       - pip3 install --prefix=/app
-          PyQt6 pyqtgraph qtawesome pyqtdarktheme2 darkdetect
+          "PyQt6>=6.9.1,<7.0.0" "pyqtgraph>=0.13.7,<0.14.0"
+          "qtawesome>=1.4.0,<2.0.0" "pyqtdarktheme2>=2.1.2,<3.0.0"
+          "darkdetect>=0.7.1,<0.8.0"
           numpy scipy h5py pygame
 
   # --- The three BioView packages + desktop integration ----------------------

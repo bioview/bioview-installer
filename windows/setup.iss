@@ -20,6 +20,11 @@
 #ifndef OutputDir
   #define OutputDir "..\dist"
 #endif
+; Installer bundle icon (the wordmark variant). Supplied by build_windows.ps1 via
+; /DSetupIconFile; the fallback lets the file open directly in the Inno IDE.
+#ifndef SetupIconFile
+  #define SetupIconFile "..\assets\installer.ico"
+#endif
 
 [Setup]
 AppName={#MyAppName}
@@ -29,6 +34,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#OutputDir}
 OutputBaseFilename={#MyAppName}-{#MyAppVersion}-Setup
+SetupIconFile={#SetupIconFile}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest

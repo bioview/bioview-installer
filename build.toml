@@ -48,6 +48,12 @@ ref = "v0.9.3"
 local = "../bioview-client"
 
 [assets]
+# App icon (favicon.svg, no wordmark): used for the .app / .exe / Flatpak app and
+# shown in the dock/taskbar and window title bar.
 icon_icns = "assets/icon.icns"
 icon_ico = "assets/icon.ico"
 icon_png = "assets/icon.png"
+# Installer icon (favicon_text.svg, with wordmark): used for the installer bundle
+# itself (e.g. the Windows setup .exe).
+installer_ico = "assets/installer.ico"
+installer_png = "assets/installer.png"

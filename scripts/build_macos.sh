@@ -26,8 +26,32 @@ if ! brew list uhd >/dev/null 2>&1; then
     brew install uhd
 fi
 UHD_PREFIX="$(brew --prefix uhd)"
-BREW_PYTHON="$(brew --prefix)/bin/python3"
+
+# Pick the Python that UHD's Homebrew bottle was built against. The `uhd` python
+# bindings are installed into a specific `python@3.x` (a formula dependency), so
+# the build venv MUST use that same interpreter or `import uhd` fails at runtime.
+# This is the crux of the previous macOS failure (components disagreeing on the
+# Python version); deriving it from UHD keeps us on a tested uhd+python combo.
+UHD_PY_FORMULA="$(brew deps uhd 2>/dev/null | grep -E '^python@3\.[0-9]+$' | head -1 || true)"
+if [ -n "$UHD_PY_FORMULA" ] && [ -x "$(brew --prefix "$UHD_PY_FORMULA")/bin/python3" ]; then
+    BREW_PYTHON="$(brew --prefix "$UHD_PY_FORMULA")/bin/python3"
+elif brew --prefix python@3.12 >/dev/null 2>&1 && [ -x "$(brew --prefix python@3.12)/bin/python3.12" ]; then
+    BREW_PYTHON="$(brew --prefix python@3.12)/bin/python3.12"
+else
+    BREW_PYTHON="$(brew --prefix)/bin/python3"
+fi
 echo "UHD prefix: $UHD_PREFIX"
+echo "Python: $BREW_PYTHON ($("$BREW_PYTHON" --version 2>&1))"
+
+# The BioView packages require >=3.12, <3.14. If UHD forces a newer Python, fail
+# early with an actionable message rather than deep in the pip install.
+PY_OK="$("$BREW_PYTHON" -c 'import sys; print(1 if (3,12) <= sys.version_info < (3,14) else 0)')"
+if [ "$PY_OK" != "1" ]; then
+    echo "ERROR: $("$BREW_PYTHON" --version 2>&1) is outside the tested range (>=3.12, <3.14)." >&2
+    echo "       UHD's Homebrew python dependency ($UHD_PY_FORMULA) is unsupported; pin a" >&2
+    echo "       UHD version built against Python 3.12/3.13." >&2
+    exit 1
+fi
 
 # --- 2. Environment (built against Homebrew python) -----------------------
 VENV_SYSTEM_SITE=1 "$HERE/prepare_env.sh" "$BUILD_DIR" "$BREW_PYTHON"
@@ -57,6 +81,7 @@ pyinstaller --noconfirm --clean --windowed \
     --collect-submodules bioview_common \
     --collect-submodules bioview_server \
     --collect-submodules bioview_client \
+    --collect-data bioview_client \
     "${ADD_BINARY[@]}" \
     "${ADD_DATA[@]}" \
     "$HERE/pyinstaller_entry.py"
