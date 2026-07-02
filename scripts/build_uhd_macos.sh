@@ -60,6 +60,12 @@ verify_uhd_import() {
     DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd; print(uhd.__file__)"
 }
 
+verify_uhd_import_bundled() {
+    # Bundled libs must load via @loader_path without DYLD_LIBRARY_PATH (PyInstaller / CI).
+    env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH \
+        "$PYTHON_BIN" -c "import uhd; print(uhd.__file__)"
+}
+
 stage_runtime_libs() {
     local dest="$1"
     local boost_prefix libusb_prefix dest_abs uhd_lib_abs
@@ -67,8 +73,14 @@ stage_runtime_libs() {
     mkdir -p "$dest"
     dest_abs="$(cd "$dest" && pwd -P)"
     uhd_lib_abs="$(cd "$UHD_PREFIX/lib" && pwd -P)"
-    if [ "$dest_abs" != "$uhd_lib_abs" ] && [ -f "$UHD_PREFIX/lib/libuhd.dylib" ]; then
-        cp -f "$UHD_PREFIX/lib/libuhd.dylib" "$dest/"
+    if [ "$dest_abs" != "$uhd_lib_abs" ]; then
+        # libpyuhd links to @loader_path/libuhd.X.Y.Z.dylib; copy versioned files, not just the symlink.
+        shopt -s nullglob
+        local lib
+        for lib in "$UHD_PREFIX/lib"/libuhd*.dylib; do
+            cp -fL "$lib" "$dest/"
+        done
+        shopt -u nullglob
     fi
     cp -f "$boost_prefix/lib"/libboost_*.dylib "$dest/"
     libusb_prefix="$(brew --prefix libusb)"
@@ -201,7 +213,7 @@ echo "=== Configuring UHD (Python API) with $("$CMAKE_BIN" --version | head -1) 
     -DENABLE_MANUAL=OFF \
     -DENABLE_DOXYGEN=OFF \
     -DENABLE_EXAMPLES=OFF \
-    -DENABLE_UTILS=OFF \
+    -DENABLE_UTILS=ON \
     -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
     -DCMAKE_PREFIX_PATH="$BOOST_PREFIX:$LIBUSB_PREFIX" \
     -DBOOST_ROOT="$BOOST_PREFIX" \
@@ -225,6 +237,13 @@ if ! verify_uhd_import; then
     echo "ERROR: uhd import failed after install" >&2
     otool -L "$(find "$(uhd_package_dir)" -name 'libpyuhd*.so' | head -1)" 2>/dev/null || true
     DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd" 2>&1 || true
+    exit 1
+fi
+if ! verify_uhd_import_bundled; then
+    echo "ERROR: uhd import failed without DYLD_LIBRARY_PATH (bundled dylibs incomplete)" >&2
+    pkg_dir="$(uhd_package_dir)"
+    ls -la "$pkg_dir"/libuhd*.dylib 2>/dev/null || echo "(no libuhd*.dylib in $pkg_dir)"
+    otool -L "$(find "$pkg_dir" -name 'libpyuhd*.so' | head -1)" 2>/dev/null || true
     exit 1
 fi
 

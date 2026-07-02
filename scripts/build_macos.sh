@@ -80,7 +80,7 @@ fi
 UHD_PREFIX="$(cat "$BUILD_DIR/uhd-prefix.path")"
 echo "UHD prefix: $UHD_PREFIX"
 
-UHD_PKG_DIR="$(python -c 'import site, pathlib, uhd; print(pathlib.Path(uhd.__file__).parent)')"
+UHD_PKG_DIR="$(python -c 'import site, pathlib; print(pathlib.Path(site.getsitepackages()[0]) / "uhd")')"
 export DYLD_LIBRARY_PATH="${UHD_PKG_DIR}:${UHD_PREFIX}/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 
 # --- 3. PyInstaller -------------------------------------------------------
