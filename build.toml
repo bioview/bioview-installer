@@ -4,7 +4,7 @@
 [app]
 name = "BioView"
 app_id = "org.bioview.BioView"
-version = "0.9.3.12"
+version = "0.9.3.13"
 description = "Open data acquisition software for cross-platform device control"
 license = "GPL-3.0-or-later"
 publisher = "BioView"
@@ -32,19 +32,19 @@ ref = "v4.6.0.0"
 [[packages]]
 name = "bioview-common"
 git = "https://github.com/bioview/bioview-common.git"
-ref = "v0.9.3.12"
+ref = "v0.9.3.13"
 local = "../bioview-common"
 
 [[packages]]
 name = "bioview-server"
 git = "https://github.com/bioview/bioview-server.git"
-ref = "v0.9.3.12"
+ref = "v0.9.3.13"
 local = "../bioview-server"
 
 [[packages]]
 name = "bioview-client"
 git = "https://github.com/bioview/bioview-client.git"
-ref = "v0.9.3.12"
+ref = "v0.9.3.13"
 local = "../bioview-client"
 
 [assets]
