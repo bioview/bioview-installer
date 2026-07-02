@@ -48,7 +48,7 @@ modules:
   - name: boost
     buildsystem: simple
     build-commands:
-      - ./bootstrap.sh --prefix=/app --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,unit_test_framework
+      - ./bootstrap.sh --prefix=/app --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization
       - ./b2 -j ${FLATPAK_BUILDER_N_JOBS} install
     sources:
       - type: git
@@ -107,15 +107,15 @@ modules:
     sources:
       - type: git
         url: https://github.com/bioview/bioview-common.git
-        tag: v0.9.3.3
+        tag: v0.9.3.4
         dest: bioview-common
       - type: git
         url: https://github.com/bioview/bioview-server.git
-        tag: v0.9.3.3
+        tag: v0.9.3.4
         dest: bioview-server
       - type: git
         url: https://github.com/bioview/bioview-client.git
-        tag: v0.9.3.3
+        tag: v0.9.3.4
         dest: bioview-client
       - type: file
         path: org.bioview.BioView.desktop
