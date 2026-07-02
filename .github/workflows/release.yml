@@ -51,20 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Boost 1.83 build
-        uses: actions/cache@v4
-        with:
-          path: |
-            build/macos/boost_1_83_0.tar.bz2
-            build/macos/boost_1_83_0
-            build/macos/boost-prefix
-          key: boost-1.83.0-${{ matrix.runner }}
-
-      # macOS: build UHD from source against python@3.13 (no PyPI wheel).
-      # CMake comes from pip (pinned <3.31); Boost 1.83 is built from tarball.
+      # macOS: build UHD 4.10 from source (no PyPI wheel). Homebrew supplies
+      # cmake, Boost 1.89+, libusb, and python@3.13.
       - name: Install build dependencies (Homebrew)
         run: |
-          brew install python@3.13 libusb ninja pkg-config
+          brew install python@3.13 cmake boost libusb ninja pkg-config
 
       - name: Build .app + .dmg
         run: |

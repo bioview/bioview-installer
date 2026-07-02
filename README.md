@@ -26,15 +26,16 @@ selected with `--role`:
 
 ### UHD (USRP driver) - hybrid delivery
 
-UHD is a compiled, version-locked library, so it is obtained per platform at
-build time and bundled into the package (pinned in `build.toml`):
+UHD is pinned in `build.toml` (currently **4.10.0.0**) and obtained per platform at
+build time:
 
-- Windows: `pip install uhd` (the official wheel ships libuhd DLLs + bindings + FPGA images).
-- macOS: `brew install uhd`; PyInstaller collects the bindings and we add `libuhd.dylib` + the UHD image files into the `.app`.
-- Linux: the Flatpak manifest builds libusb + Boost + UHD (with the Python API) from source inside the sandbox.
+- **Windows:** `pip install uhd` (official wheel ships libuhd DLLs, bindings, and FPGA images).
+- **macOS:** UHD 4.10 is **built from source** against Homebrew Boost/libusb and
+  `python@3.13`; native dylibs are staged beside the `uhd` Python package for PyInstaller.
+- **Linux:** the Flatpak manifest builds libusb + Boost + UHD (with the Python API) from source.
 
-The USRP backend import is already guarded in the server, so the app still runs
-(with the dummy backend) on machines where UHD is unavailable.
+The USRP backend import is guarded in the server, so the app still runs
+(with the dummy backend) when UHD is unavailable.
 
 ## Layout
 
@@ -87,9 +88,9 @@ builders on their native runners when a `v*` tag is pushed and attaches the
 ## Known limitations
 
 - Bundles are large (Qt + UHD + FPGA images).
-- macOS builds are per-arch and unsigned by default (Gatekeeper warns) unless an
-  Apple Developer ID is provided via `CODESIGN_IDENTITY`; UHD has no macOS pip
-  wheel, so macOS must be built on macOS.
+- macOS builds compile UHD 4.10 from source (~10 min per arch) and are unsigned by
+  default (Gatekeeper warns) unless an Apple Developer ID is provided via
+  `CODESIGN_IDENTITY`; there is no macOS PyPI wheel for UHD.
 - Windows USB USRPs may still need a one-time WinUSB driver (Zadig/UHD installer);
   unsigned installers trigger SmartScreen.
 - Flatpak USB access depends on `--device=all`; the from-source UHD/Boost build is

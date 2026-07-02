@@ -2,7 +2,8 @@
 # Build the macOS BioView.app and package it into a .dmg.
 #
 # Hybrid UHD: build libuhd + Python API from source (PyPI has no macOS wheel).
-# PyInstaller bundles libuhd.dylib, the uhd python package, and FPGA images.
+# Homebrew Boost/libusb supply native deps; PyInstaller collects the uhd package
+# and bundled dylibs plus FPGA images.
 #
 # Output: dist/<App>-<version>-<arch>.dmg
 set -euo pipefail
@@ -48,9 +49,9 @@ preflight() {
   fi
 }
 
-# --- 1. Native build deps (not cmake/boost — those are pinned/built in-tree) -
+# --- 1. Native build deps ---------------------------------------------------
 preflight
-for formula in python@3.13 libusb ninja pkg-config; do
+for formula in python@3.13 cmake boost libusb ninja pkg-config; do
     if ! brew list "$formula" >/dev/null 2>&1; then
         echo "=== Installing $formula via Homebrew ==="
         brew install "$formula"

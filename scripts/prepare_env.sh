@@ -5,7 +5,7 @@
 #
 # Usage: prepare_env.sh <build_dir> [python_bin]
 # Env:
-#   WITH_UHD_SOURCE=1    build UHD from source (macOS; pip cmake + Boost tarball)
+#   WITH_UHD_SOURCE=1    build UHD 4.10 from source (macOS; no PyPI wheel)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,8 +54,8 @@ pip install "$SRC_DIR/bioview-server"
 pip install "$SRC_DIR/bioview-client"
 
 if [ "${WITH_UHD_SOURCE:-0}" = "1" ]; then
-    echo "=== Preparing UHD build deps (pinned cmake + python modules) ==="
-    pip install "cmake>=3.22,<3.31" setuptools wheel mako numpy
+    echo "=== Preparing UHD build deps ==="
+    pip install mako numpy
     "$HERE/build_uhd_macos.sh" "$VENV/bin/python" "$BUILD_DIR"
 elif [ "${WITH_UHD_PIP:-0}" = "1" ]; then
     UHD_VERSION="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.version)"

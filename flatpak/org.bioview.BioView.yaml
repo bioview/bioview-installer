@@ -82,7 +82,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/EttusResearch/uhd.git
-        tag: v4.6.0.0
+        tag: v4.10.0.0
 
   # --- BioView Python/Qt runtime dependencies --------------------------------
   - name: python-deps

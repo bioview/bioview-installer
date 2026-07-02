@@ -20,11 +20,11 @@ func = "main"
 
 [uhd]
 # Hybrid UHD delivery: this single version is obtained per-platform at build time
-# (pip wheel on Windows, Homebrew on macOS, built from source in the Flatpak).
-version = "4.6.0.0"
-# Git ref used for the Flatpak source build of UHD.
+# (pip wheel on Windows, source build on macOS and Flatpak).
+version = "4.10.0.0"
+# Git ref used for the macOS / Flatpak source builds of UHD.
 git = "https://github.com/EttusResearch/uhd.git"
-ref = "v4.6.0.0"
+ref = "v4.10.0.0"
 
 # BioView is three separate packages. The builders prefer a local sibling checkout
 # (great for development from this monorepo) and fall back to a shallow git clone
