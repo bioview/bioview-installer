@@ -101,9 +101,13 @@ verify_uhd_import() {
 
 stage_runtime_libs() {
     local dest="$1"
-    local libusb_prefix
+    local libusb_prefix dest_abs uhd_lib_abs
     mkdir -p "$dest"
-    cp -f "$UHD_PREFIX/lib/libuhd.dylib" "$dest/"
+    dest_abs="$(cd "$dest" && pwd -P)"
+    uhd_lib_abs="$(cd "$UHD_PREFIX/lib" && pwd -P)"
+    if [ "$dest_abs" != "$uhd_lib_abs" ] && [ -f "$UHD_PREFIX/lib/libuhd.dylib" ]; then
+        cp -f "$UHD_PREFIX/lib/libuhd.dylib" "$dest/"
+    fi
     cp -f "$BOOST_PREFIX/lib"/libboost_*.dylib "$dest/"
     libusb_prefix="$(brew --prefix libusb)"
     if compgen -G "$libusb_prefix/lib/libusb-1.0"*.dylib >/dev/null; then
