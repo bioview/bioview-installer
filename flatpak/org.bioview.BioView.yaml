@@ -109,15 +109,15 @@ modules:
     sources:
       - type: git
         url: https://github.com/bioview/bioview-common.git
-        tag: v0.9.3.11
+        tag: v0.9.3.12
         dest: bioview-common
       - type: git
         url: https://github.com/bioview/bioview-server.git
-        tag: v0.9.3.11
+        tag: v0.9.3.12
         dest: bioview-server
       - type: git
         url: https://github.com/bioview/bioview-client.git
-        tag: v0.9.3.11
+        tag: v0.9.3.12
         dest: bioview-client
       - type: file
         path: org.bioview.BioView.desktop
