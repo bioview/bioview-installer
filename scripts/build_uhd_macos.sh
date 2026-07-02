@@ -19,13 +19,37 @@ UHD_REF="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.ref)"
 
 UHD_SRC="$BUILD_DIR/uhd-src"
 UHD_PREFIX="$BUILD_DIR/uhd-prefix"
+BOOST_PREFIX="$BUILD_DIR/boost-prefix"
 rm -rf "$UHD_SRC" "$UHD_PREFIX"
 mkdir -p "$UHD_SRC" "$UHD_PREFIX"
+
+NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+
+# UHD 4.6 expects classic Boost component packages (e.g. boost_system). Homebrew
+# ships Boost 1.90 where system is header-only and no boost_systemConfig.cmake exists.
+# Build the same Boost 1.83 tree used by the Flatpak manifest.
+ensure_boost() {
+    if [ -f "$BOOST_PREFIX/lib/cmake/Boost-1.83.0/BoostConfig.cmake" ]; then
+        echo "=== Using cached Boost 1.83 at $BOOST_PREFIX ==="
+        return
+    fi
+    local boost_src="$BUILD_DIR/boost-src"
+    rm -rf "$boost_src"
+    echo "=== Building Boost 1.83.0 ==="
+    git clone --depth 1 --branch boost-1.83.0 https://github.com/boostorg/boost.git "$boost_src"
+    (
+        cd "$boost_src"
+        ./bootstrap.sh --prefix="$BOOST_PREFIX" \
+            --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,test
+        ./b2 -j "$NPROC" install
+    )
+}
+
+ensure_boost
 
 echo "=== Cloning UHD $UHD_REF ==="
 git clone --depth 1 --branch "$UHD_REF" "$UHD_GIT" "$UHD_SRC"
 
-BOOST_PREFIX="$(brew --prefix boost)"
 LIBUSB_PREFIX="$(brew --prefix libusb)"
 CMAKE_PREFIX_PATH="$BOOST_PREFIX:$LIBUSB_PREFIX"
 
@@ -40,9 +64,10 @@ cmake -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
     -DENABLE_EXAMPLES=OFF \
     -DENABLE_UTILS=OFF \
     -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
-    -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+    -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+    -DBoost_ROOT="$BOOST_PREFIX" \
+    -DBoost_NO_SYSTEM_PATHS=ON
 
-NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 echo "=== Building UHD (-j $NPROC) ==="
 cmake --build "$UHD_SRC/host/build" -j "$NPROC"
 cmake --install "$UHD_SRC/host/build"

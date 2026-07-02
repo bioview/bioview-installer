@@ -37,7 +37,7 @@ select_supported_python() {
 }
 
 # --- 1. Build toolchain (Boost/libusb for UHD source build) ---------------
-for formula in python@3.13 cmake boost libusb ninja pkg-config; do
+for formula in python@3.13 cmake libusb ninja pkg-config; do
     if ! brew list "$formula" >/dev/null 2>&1; then
         echo "=== Installing $formula via Homebrew ==="
         brew install "$formula"

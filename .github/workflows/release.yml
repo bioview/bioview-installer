@@ -54,7 +54,7 @@ jobs:
       # bindings target an unsupported python@3.x).
       - name: Install build dependencies (Homebrew)
         run: |
-          brew install python@3.13 cmake boost libusb ninja pkg-config
+          brew install python@3.13 cmake libusb ninja pkg-config
 
       - name: Build .app + .dmg
         run: |
