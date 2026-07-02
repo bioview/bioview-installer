@@ -50,17 +50,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install UHD first: its Homebrew bottle pulls in the specific python@3.x it
-      # was built against, and build_macos.sh uses that exact interpreter so the
-      # uhd python bindings are importable. python@3.12 is a tested fallback.
-      - name: Install UHD (Homebrew)
-        run: brew install uhd
-
-      - name: Ensure a tested Python fallback (Homebrew)
-        run: brew install python@3.12 || true
+      # Use a supported Python (3.13/3.12), not whatever Homebrew UHD currently
+      # pulls in (often python@3.14). Python bindings come from pip; Homebrew UHD
+      # supplies libuhd and FPGA images only.
+      - name: Install build dependencies (Homebrew)
+        run: |
+          brew install python@3.13 cmake boost uhd
 
       - name: Build .app + .dmg
-        run: bash scripts/build_macos.sh
+        run: |
+          echo "BIOVIEW_PYTHON=$(brew --prefix python@3.13)/bin/python3.13" >> "$GITHUB_ENV"
+          bash scripts/build_macos.sh
 
       - uses: actions/upload-artifact@v4
         with:

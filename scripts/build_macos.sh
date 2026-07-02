@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Build the macOS BioView.app and package it into a .dmg.
 #
-# Hybrid UHD: Homebrew provides libuhd + the `uhd` python bindings + FPGA images.
-# We build the venv against Homebrew's python (with --system-site-packages) so the
-# bindings are importable, then let PyInstaller collect them and we explicitly add
-# libuhd.dylib and the UHD image files into the bundle.
+# Hybrid UHD: Homebrew provides libuhd + FPGA images; Python bindings come from
+# pip (uhd==<version>) into a venv built with python@3.13 or python@3.12.
+# PyInstaller collects the pip uhd package plus libuhd.dylib and UHD images.
 #
 # Output: dist/<App>-<version>-<arch>.dmg
 set -euo pipefail
@@ -20,41 +19,44 @@ ARCH="$(uname -m)"
 
 mkdir -p "$DIST_DIR"
 
-# --- 1. UHD via Homebrew --------------------------------------------------
+select_supported_python() {
+    if [ -n "${BIOVIEW_PYTHON:-}" ] && [ -x "$BIOVIEW_PYTHON" ]; then
+        echo "$BIOVIEW_PYTHON"
+        return
+    fi
+    local ver prefix py
+    for ver in 3.13 3.12; do
+        prefix="$(brew --prefix "python@${ver}" 2>/dev/null)" || continue
+        py="${prefix}/bin/python${ver}"
+        if [ -x "$py" ]; then
+            echo "$py"
+            return
+        fi
+    done
+    echo "ERROR: need Homebrew python@3.13 or python@3.12 (install with: brew install python@3.13)" >&2
+    exit 1
+}
+
+# --- 1. UHD via Homebrew (lib + FPGA images; not Python bindings) ---------
 if ! brew list uhd >/dev/null 2>&1; then
     echo "=== Installing UHD via Homebrew ==="
     brew install uhd
 fi
 UHD_PREFIX="$(brew --prefix uhd)"
 
-# Pick the Python that UHD's Homebrew bottle was built against. The `uhd` python
-# bindings are installed into a specific `python@3.x` (a formula dependency), so
-# the build venv MUST use that same interpreter or `import uhd` fails at runtime.
-# This is the crux of the previous macOS failure (components disagreeing on the
-# Python version); deriving it from UHD keeps us on a tested uhd+python combo.
-UHD_PY_FORMULA="$(brew deps uhd 2>/dev/null | grep -E '^python@3\.[0-9]+$' | head -1 || true)"
-if [ -n "$UHD_PY_FORMULA" ] && [ -x "$(brew --prefix "$UHD_PY_FORMULA")/bin/python3" ]; then
-    BREW_PYTHON="$(brew --prefix "$UHD_PY_FORMULA")/bin/python3"
-elif brew --prefix python@3.12 >/dev/null 2>&1 && [ -x "$(brew --prefix python@3.12)/bin/python3.12" ]; then
-    BREW_PYTHON="$(brew --prefix python@3.12)/bin/python3.12"
-else
-    BREW_PYTHON="$(brew --prefix)/bin/python3"
-fi
+BREW_PYTHON="$(select_supported_python)"
 echo "UHD prefix: $UHD_PREFIX"
 echo "Python: $BREW_PYTHON ($("$BREW_PYTHON" --version 2>&1))"
 
-# The BioView packages require >=3.12, <3.14. If UHD forces a newer Python, fail
-# early with an actionable message rather than deep in the pip install.
 PY_OK="$("$BREW_PYTHON" -c 'import sys; print(1 if (3,12) <= sys.version_info < (3,14) else 0)')"
 if [ "$PY_OK" != "1" ]; then
     echo "ERROR: $("$BREW_PYTHON" --version 2>&1) is outside the tested range (>=3.12, <3.14)." >&2
-    echo "       UHD's Homebrew python dependency ($UHD_PY_FORMULA) is unsupported; pin a" >&2
-    echo "       UHD version built against Python 3.12/3.13." >&2
+    echo "       Set BIOVIEW_PYTHON to a supported interpreter (e.g. python@3.13)." >&2
     exit 1
 fi
 
-# --- 2. Environment (built against Homebrew python) -----------------------
-VENV_SYSTEM_SITE=1 "$HERE/prepare_env.sh" "$BUILD_DIR" "$BREW_PYTHON"
+# --- 2. Environment (pip uhd bindings for the chosen Python) ----------------
+WITH_UHD_PIP=1 "$HERE/prepare_env.sh" "$BUILD_DIR" "$BREW_PYTHON"
 # shellcheck disable=SC1091
 source "$BUILD_DIR/venv/bin/activate"
 
@@ -69,6 +71,13 @@ ADD_BINARY=()
 ADD_DATA=()
 [ -d "$UHD_PREFIX/share/uhd" ] && ADD_DATA=(--add-data "$UHD_PREFIX/share/uhd:share/uhd")
 
+UHD_COLLECT=()
+if python -c "import uhd" >/dev/null 2>&1; then
+    UHD_COLLECT=(--collect-all uhd)
+else
+    echo "WARNING: uhd python module not importable; USRP support will be omitted from the bundle" >&2
+fi
+
 echo "=== Running PyInstaller ==="
 pyinstaller --noconfirm --clean --windowed \
     --name "$APP_NAME" \
@@ -76,7 +85,7 @@ pyinstaller --noconfirm --clean --windowed \
     --workpath "$BUILD_DIR/pyinstaller_work" \
     --specpath "$BUILD_DIR" \
     "${ICON_ARG[@]}" \
-    --collect-all uhd \
+    "${UHD_COLLECT[@]}" \
     --collect-all pyqtgraph \
     --collect-submodules bioview_common \
     --collect-submodules bioview_server \

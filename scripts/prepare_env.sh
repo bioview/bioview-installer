@@ -58,6 +58,17 @@ pip install "$SRC_DIR/bioview-client"
 if [ "${WITH_UHD_PIP:-0}" = "1" ]; then
     UHD_VERSION="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.version)"
     echo "=== Installing uhd==$UHD_VERSION from PyPI ==="
+    if [ "$(uname -s)" = "Darwin" ]; then
+        UHD_PREFIX="$(brew --prefix uhd 2>/dev/null || true)"
+        if [ -n "$UHD_PREFIX" ]; then
+            export CMAKE_PREFIX_PATH="${UHD_PREFIX}:${CMAKE_PREFIX_PATH:-}"
+            export UHD_ROOT="$UHD_PREFIX"
+        fi
+        BOOST_PREFIX="$(brew --prefix boost 2>/dev/null || true)"
+        if [ -n "$BOOST_PREFIX" ]; then
+            export CMAKE_PREFIX_PATH="${BOOST_PREFIX}:${CMAKE_PREFIX_PATH:-}"
+        fi
+    fi
     pip install "uhd==$UHD_VERSION" || echo "WARNING: uhd pip install failed (USRP support will be unavailable)"
 fi
 
