@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Build UHD (libuhd + Python API) from source on macOS.
+#
+# PyPI ships uhd wheels for Windows only; Homebrew's python bindings target whatever
+# python@3.x UHD currently depends on (often 3.14), which is outside BioView's
+# tested range. Building from source against python@3.13/3.12 is the reliable path.
+#
+# Usage: build_uhd_macos.sh <python_bin> <build_dir>
+# Writes <build_dir>/uhd-prefix.path with the install prefix.
+set -euo pipefail
+
+PYTHON_BIN="${1:?python interpreter required}"
+BUILD_DIR="${2:?build dir required}"
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+UHD_GIT="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.git)"
+UHD_REF="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.ref)"
+
+UHD_SRC="$BUILD_DIR/uhd-src"
+UHD_PREFIX="$BUILD_DIR/uhd-prefix"
+rm -rf "$UHD_SRC" "$UHD_PREFIX"
+mkdir -p "$UHD_SRC" "$UHD_PREFIX"
+
+echo "=== Cloning UHD $UHD_REF ==="
+git clone --depth 1 --branch "$UHD_REF" "$UHD_GIT" "$UHD_SRC"
+
+BOOST_PREFIX="$(brew --prefix boost)"
+LIBUSB_PREFIX="$(brew --prefix libusb)"
+CMAKE_PREFIX_PATH="$BOOST_PREFIX:$LIBUSB_PREFIX"
+
+echo "=== Configuring UHD (Python API) ==="
+cmake -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$UHD_PREFIX" \
+    -DENABLE_PYTHON_API=ON \
+    -DENABLE_TESTS=OFF \
+    -DENABLE_MANUAL=OFF \
+    -DENABLE_DOXYGEN=OFF \
+    -DENABLE_EXAMPLES=OFF \
+    -DENABLE_UTILS=OFF \
+    -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
+    -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+
+NPROC="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+echo "=== Building UHD (-j $NPROC) ==="
+cmake --build "$UHD_SRC/host/build" -j "$NPROC"
+cmake --install "$UHD_SRC/host/build"
+
+echo "=== Installing UHD Python bindings into venv ==="
+VENV_SITE="$("$PYTHON_BIN" -c 'import site; print(site.getsitepackages()[0])')"
+PYTAG="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+INSTALLED=0
+for candidate in \
+    "$UHD_PREFIX/lib/python$PYTAG/site-packages/uhd" \
+    "$UHD_PREFIX/lib/python$PYTAG/dist-packages/uhd"; do
+    if [ -d "$candidate" ]; then
+        cp -R "$candidate" "$VENV_SITE/"
+        INSTALLED=1
+        break
+    fi
+done
+if [ "$INSTALLED" = "0" ]; then
+    FOUND="$(find "$UHD_PREFIX" -type d -name uhd -path '*/site-packages/*' 2>/dev/null | head -1 || true)"
+    if [ -n "$FOUND" ]; then
+        cp -R "$FOUND" "$VENV_SITE/"
+        INSTALLED=1
+    fi
+fi
+if [ "$INSTALLED" = "0" ]; then
+    echo "ERROR: could not locate UHD python package under $UHD_PREFIX" >&2
+    exit 1
+fi
+
+if ! "$PYTHON_BIN" -c "import uhd" >/dev/null 2>&1; then
+    echo "ERROR: UHD python module not importable after install" >&2
+    exit 1
+fi
+
+echo "=== Downloading UHD FPGA/firmware images ==="
+"$UHD_PREFIX/bin/uhd_images_downloader" || echo "WARNING: uhd_images_downloader failed"
+
+printf '%s\n' "$UHD_PREFIX" > "$BUILD_DIR/uhd-prefix.path"
+echo "=== UHD ready at $UHD_PREFIX ==="

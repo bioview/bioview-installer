@@ -50,12 +50,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use a supported Python (3.13/3.12), not whatever Homebrew UHD currently
-      # pulls in (often python@3.14). Python bindings come from pip; Homebrew UHD
-      # supplies libuhd and FPGA images only.
+      # macOS: build UHD from source against python@3.13 (no PyPI wheel; Homebrew
+      # bindings target an unsupported python@3.x).
       - name: Install build dependencies (Homebrew)
         run: |
-          brew install python@3.13 cmake boost uhd
+          brew install python@3.13 cmake boost libusb ninja pkg-config
 
       - name: Build .app + .dmg
         run: |

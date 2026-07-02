@@ -48,7 +48,9 @@ modules:
   - name: boost
     buildsystem: simple
     build-commands:
-      - ./bootstrap.sh --prefix=/app --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization
+      # UHD's CMake always requires boost_unit_test_framework even with ENABLE_TESTS=OFF.
+      # In Boost 1.83+ the b2 library name is "test" (not unit_test_framework).
+      - ./bootstrap.sh --prefix=/app --with-libraries=program_options,system,filesystem,thread,date_time,chrono,atomic,regex,serialization,test
       - ./b2 -j ${FLATPAK_BUILDER_N_JOBS} install
     sources:
       - type: git

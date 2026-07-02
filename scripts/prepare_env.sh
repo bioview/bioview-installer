@@ -7,7 +7,8 @@
 # Env:
 #   VENV_SYSTEM_SITE=1   create the venv with --system-site-packages (needed on
 #                        macOS so the Homebrew `uhd` python bindings are visible)
-#   WITH_UHD_PIP=1       additionally `pip install uhd==<version>` (Windows-style)
+#   WITH_UHD_PIP=1       `pip install uhd==<version>` (Windows; PyPI has wheels there)
+#   WITH_UHD_SOURCE=1    build UHD from source (macOS; no PyPI wheel)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -55,7 +56,11 @@ pip install "$SRC_DIR/bioview-common"
 pip install "$SRC_DIR/bioview-server"
 pip install "$SRC_DIR/bioview-client"
 
-if [ "${WITH_UHD_PIP:-0}" = "1" ]; then
+if [ "${WITH_UHD_SOURCE:-0}" = "1" ]; then
+    echo "=== Building UHD from source (macOS) ==="
+    pip install mako numpy
+    "$HERE/build_uhd_macos.sh" "$VENV/bin/python" "$BUILD_DIR"
+elif [ "${WITH_UHD_PIP:-0}" = "1" ]; then
     UHD_VERSION="$("$PYTHON_BIN" "$HERE/buildcfg.py" get uhd.version)"
     echo "=== Installing uhd==$UHD_VERSION from PyPI ==="
     if [ "$(uname -s)" = "Darwin" ]; then

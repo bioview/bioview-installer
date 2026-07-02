@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Build the macOS BioView.app and package it into a .dmg.
 #
-# Hybrid UHD: Homebrew provides libuhd + FPGA images; Python bindings come from
-# pip (uhd==<version>) into a venv built with python@3.13 or python@3.12.
-# PyInstaller collects the pip uhd package plus libuhd.dylib and UHD images.
+# Hybrid UHD: build libuhd + Python API from source (PyPI has no macOS wheel).
+# PyInstaller bundles libuhd.dylib, the uhd python package, and FPGA images.
 #
 # Output: dist/<App>-<version>-<arch>.dmg
 set -euo pipefail
@@ -37,15 +36,15 @@ select_supported_python() {
     exit 1
 }
 
-# --- 1. UHD via Homebrew (lib + FPGA images; not Python bindings) ---------
-if ! brew list uhd >/dev/null 2>&1; then
-    echo "=== Installing UHD via Homebrew ==="
-    brew install uhd
-fi
-UHD_PREFIX="$(brew --prefix uhd)"
+# --- 1. Build toolchain (Boost/libusb for UHD source build) ---------------
+for formula in python@3.13 cmake boost libusb ninja pkg-config; do
+    if ! brew list "$formula" >/dev/null 2>&1; then
+        echo "=== Installing $formula via Homebrew ==="
+        brew install "$formula"
+    fi
+done
 
 BREW_PYTHON="$(select_supported_python)"
-echo "UHD prefix: $UHD_PREFIX"
 echo "Python: $BREW_PYTHON ($("$BREW_PYTHON" --version 2>&1))"
 
 PY_OK="$("$BREW_PYTHON" -c 'import sys; print(1 if (3,12) <= sys.version_info < (3,14) else 0)')"
@@ -55,10 +54,17 @@ if [ "$PY_OK" != "1" ]; then
     exit 1
 fi
 
-# --- 2. Environment (pip uhd bindings for the chosen Python) ----------------
-WITH_UHD_PIP=1 "$HERE/prepare_env.sh" "$BUILD_DIR" "$BREW_PYTHON"
+# --- 2. Environment (build UHD from source for the chosen Python) ---------
+WITH_UHD_SOURCE=1 "$HERE/prepare_env.sh" "$BUILD_DIR" "$BREW_PYTHON"
 # shellcheck disable=SC1091
 source "$BUILD_DIR/venv/bin/activate"
+
+if [ ! -f "$BUILD_DIR/uhd-prefix.path" ]; then
+    echo "ERROR: UHD build did not produce $BUILD_DIR/uhd-prefix.path" >&2
+    exit 1
+fi
+UHD_PREFIX="$(cat "$BUILD_DIR/uhd-prefix.path")"
+echo "UHD prefix: $UHD_PREFIX"
 
 # --- 3. PyInstaller -------------------------------------------------------
 ICON_ARG=()
@@ -75,7 +81,8 @@ UHD_COLLECT=()
 if python -c "import uhd" >/dev/null 2>&1; then
     UHD_COLLECT=(--collect-all uhd)
 else
-    echo "WARNING: uhd python module not importable; USRP support will be omitted from the bundle" >&2
+    echo "ERROR: uhd python module not importable after source build" >&2
+    exit 1
 fi
 
 echo "=== Running PyInstaller ==="
@@ -84,15 +91,15 @@ pyinstaller --noconfirm --clean --windowed \
     --distpath "$BUILD_DIR/pyinstaller_dist" \
     --workpath "$BUILD_DIR/pyinstaller_work" \
     --specpath "$BUILD_DIR" \
-    "${ICON_ARG[@]}" \
-    "${UHD_COLLECT[@]}" \
+    ${ICON_ARG[@]+"${ICON_ARG[@]}"} \
+    ${UHD_COLLECT[@]+"${UHD_COLLECT[@]}"} \
     --collect-all pyqtgraph \
     --collect-submodules bioview_common \
     --collect-submodules bioview_server \
     --collect-submodules bioview_client \
     --collect-data bioview_client \
-    "${ADD_BINARY[@]}" \
-    "${ADD_DATA[@]}" \
+    ${ADD_BINARY[@]+"${ADD_BINARY[@]}"} \
+    ${ADD_DATA[@]+"${ADD_DATA[@]}"} \
     "$HERE/pyinstaller_entry.py"
 
 APP_BUNDLE="$BUILD_DIR/pyinstaller_dist/$APP_NAME.app"
