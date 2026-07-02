@@ -79,15 +79,13 @@ fi
 UHD_PREFIX="$(cat "$BUILD_DIR/uhd-prefix.path")"
 echo "UHD prefix: $UHD_PREFIX"
 
-export DYLD_LIBRARY_PATH="$UHD_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+UHD_PKG_DIR="$(python -c 'import site, pathlib, uhd; print(pathlib.Path(uhd.__file__).parent)')"
+export DYLD_LIBRARY_PATH="${UHD_PKG_DIR}:${UHD_PREFIX}/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 
 # --- 3. PyInstaller -------------------------------------------------------
 ICON_ARG=()
 ICON_PATH="$INSTALLER_DIR/$(python3 "$HERE/buildcfg.py" get assets.icon_icns)"
 [ -f "$ICON_PATH" ] && ICON_ARG=(--icon "$ICON_PATH")
-
-ADD_BINARY=()
-[ -f "$UHD_PREFIX/lib/libuhd.dylib" ] && ADD_BINARY=(--add-binary "$UHD_PREFIX/lib/libuhd.dylib:.")
 
 ADD_DATA=()
 [ -d "$UHD_PREFIX/share/uhd" ] && ADD_DATA=(--add-data "$UHD_PREFIX/share/uhd:share/uhd")
@@ -113,7 +111,6 @@ pyinstaller --noconfirm --clean --windowed \
     --collect-submodules bioview_server \
     --collect-submodules bioview_client \
     --collect-data bioview_client \
-    ${ADD_BINARY[@]+"${ADD_BINARY[@]}"} \
     ${ADD_DATA[@]+"${ADD_DATA[@]}"} \
     "$HERE/pyinstaller_entry.py"
 

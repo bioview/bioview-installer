@@ -75,12 +75,76 @@ ensure_boost() {
     fi
 }
 
+uhd_package_dir() {
+    "$PYTHON_BIN" -c 'import site, pathlib; print(pathlib.Path(site.getsitepackages()[0]) / "uhd")'
+}
+
 uhd_library_path() {
-    printf '%s' "$UHD_PREFIX/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+    local paths=()
+    local pkg_dir libusb_prefix
+    if pkg_dir="$(uhd_package_dir 2>/dev/null)" && [ -d "$pkg_dir" ]; then
+        paths+=("$pkg_dir")
+    fi
+    paths+=("$UHD_PREFIX/lib" "$BOOST_PREFIX/lib")
+    libusb_prefix="$(brew --prefix libusb 2>/dev/null || true)"
+    [ -n "$libusb_prefix" ] && [ -d "$libusb_prefix/lib" ] && paths+=("$libusb_prefix/lib")
+    if [ -n "${DYLD_LIBRARY_PATH:-}" ]; then
+        paths+=("$DYLD_LIBRARY_PATH")
+    fi
+    local IFS=:
+    printf '%s' "${paths[*]}"
 }
 
 verify_uhd_import() {
     DYLD_LIBRARY_PATH="$(uhd_library_path)" "$PYTHON_BIN" -c "import uhd; print(uhd.__file__)"
+}
+
+stage_runtime_libs() {
+    local dest="$1"
+    local libusb_prefix
+    mkdir -p "$dest"
+    cp -f "$UHD_PREFIX/lib/libuhd.dylib" "$dest/"
+    cp -f "$BOOST_PREFIX/lib"/libboost_*.dylib "$dest/"
+    libusb_prefix="$(brew --prefix libusb)"
+    if compgen -G "$libusb_prefix/lib/libusb-1.0"*.dylib >/dev/null; then
+        cp -f "$libusb_prefix/lib"/libusb-1.0*.dylib "$dest/"
+    fi
+}
+
+fix_loader_paths() {
+    local binary="$1"
+    local dep base
+    while IFS= read -r dep; do
+        dep="${dep//$'\t'/}"
+        dep="${dep%% (*}"
+        case "$dep" in
+            ""|*":"*) continue ;;
+            @loader_path/*|@executable_path/*|/usr/lib/*|/System/*|/Library/*) continue ;;
+        esac
+        base="$(basename "$dep")"
+        install_name_tool -change "$dep" "@loader_path/$base" "$binary" 2>/dev/null || true
+    done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
+}
+
+bundle_uhd_native_libs() {
+    # libpyuhd links libuhd + Boost via @rpath; copy deps beside the module and
+    # rewrite load paths so import/PyInstaller work without a global Boost install.
+    local pkg_dir binary
+    pkg_dir="$(uhd_package_dir)"
+    echo "=== Bundling native libs into $pkg_dir ==="
+    stage_runtime_libs "$pkg_dir"
+    stage_runtime_libs "$UHD_PREFIX/lib"
+
+    shopt -s nullglob
+    for _ in 1 2; do
+        for binary in "$pkg_dir"/*.dylib "$pkg_dir"/*.so; do
+            fix_loader_paths "$binary"
+        done
+        for binary in "$UHD_PREFIX/lib"/*.dylib; do
+            fix_loader_paths "$binary"
+        done
+    done
+    shopt -u nullglob
 }
 
 install_uhd_python_bindings() {
@@ -165,6 +229,7 @@ fi
 
 echo "=== Verifying UHD Python bindings ==="
 install_uhd_python_bindings
+bundle_uhd_native_libs
 if ! verify_uhd_import; then
     echo "ERROR: uhd import failed after install" >&2
     "$PYTHON_BIN" -c "import sys, site; print('prefix', sys.prefix); print('site', site.getsitepackages())"
