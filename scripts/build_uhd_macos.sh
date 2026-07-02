@@ -74,8 +74,8 @@ cmake -S "$UHD_SRC/host" -B "$UHD_SRC/host/build" -G Ninja \
     -DENABLE_UTILS=OFF \
     -DPYTHON_EXECUTABLE="$PYTHON_BIN" \
     -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
-    -DBoost_ROOT="$BOOST_PREFIX" \
-    -DBoost_NO_SYSTEM_PATHS=ON
+    -DBOOST_ROOT="$BOOST_PREFIX" \
+    -DBOOST_NO_SYSTEM_PATHS=ON
 
 echo "=== Building UHD (-j $NPROC) ==="
 cmake --build "$UHD_SRC/host/build" -j "$NPROC"
