@@ -38,7 +38,16 @@ if (Test-Path $Venv) { Remove-Item $Venv -Recurse -Force }
 & $PythonBin -m venv $Venv
 $Py = Join-Path $Venv "Scripts\python.exe"
 
-& $Py -m pip install --upgrade pip wheel pyinstaller
+& $Py -m pip install --upgrade pip wheel "pyinstaller>=6.10"
+
+# The uhd PyPI wheel requires numpy<2.0. bioview-server pulls scipy first, which
+# otherwise installs numpy 2.x; scipy then fails at runtime in the PyInstaller bundle
+# (AttributeError: module 'numpy' has no attribute 'long').
+Write-Host "=== Pinning scientific stack (numpy<2 for uhd + PyInstaller) ===" -ForegroundColor Cyan
+& $Py -m pip install `
+    "numpy>=1.26,<2.0" `
+    "scipy>=1.16.1,<2.0.0" `
+    "h5py>=3.14.0,<4.0.0"
 
 Write-Host "=== Installing BioView packages (common -> server -> client) ===" -ForegroundColor Cyan
 & $Py -m pip install (Join-Path $SrcDir "bioview-common")
@@ -49,5 +58,8 @@ $UhdVersion = (& $PythonBin "$Here\buildcfg.py" get uhd.version).Trim()
 Write-Host "=== Installing uhd==$UhdVersion from PyPI ===" -ForegroundColor Cyan
 try { & $Py -m pip install "uhd==$UhdVersion" }
 catch { Write-Warning "uhd pip install failed (USRP support will be unavailable)" }
+
+Write-Host "=== Verifying scipy/numpy import ===" -ForegroundColor Cyan
+& $Py -c "import numpy, scipy.signal; print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
 
 Write-Host "=== Environment ready: $Venv ===" -ForegroundColor Green

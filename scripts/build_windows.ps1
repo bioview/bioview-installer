@@ -40,6 +40,10 @@ Write-Host "=== Running PyInstaller ===" -ForegroundColor Cyan
     @IconArgs `
     --collect-all uhd `
     --collect-all pyqtgraph `
+    --collect-all numpy `
+    --collect-all scipy `
+    --collect-all h5py `
+    --collect-all pygame `
     --collect-submodules bioview_common `
     --collect-submodules bioview_server `
     --collect-submodules bioview_client `
