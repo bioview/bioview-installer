@@ -57,8 +57,8 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\BioView Monitor"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
-; Associate .bview experiment files with the Monitor (launcher forwards the path).
-Root: HKA; Subkey: "Software\Classes\.bview"; ValueType: string; ValueName: ""; ValueData: "BioView.Experiment"; Flags: uninsdeletevalue
+; Associate BioView config files with the Monitor (launcher forwards the path).
+Root: HKA; Subkey: "Software\Classes\.bvi"; ValueType: string; ValueName: ""; ValueData: "BioView.Experiment"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\BioView.Experiment"; ValueType: string; ValueName: ""; ValueData: "BioView Experiment"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\BioView.Experiment\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"
 Root: HKA; Subkey: "Software\Classes\BioView.Experiment\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" --config-file ""%1"""

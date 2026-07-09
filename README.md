@@ -37,6 +37,12 @@ build time:
 The USRP backend import is guarded in the server, so the app still runs
 (with the dummy backend) when UHD is unavailable.
 
+### Config file association
+
+BioView configuration files use the `.bvi` extension (JSON payload). The
+Windows installer registers `.bvi` to open with BioView and forwards the file
+path to the monitor via `--config-file`.
+
 ## Layout
 
 ```
@@ -54,7 +60,6 @@ flatpak/
   org.bioview.BioView.metainfo.xml
 windows/setup.iss                  # Inno Setup script (parametrized via /D defines)
 .github/workflows/release.yml      # CI matrix; builds + attaches all artifacts on tag
-archive/                           # superseded legacy scripts (deb/rpm/old build_*)
 ```
 
 The builders prefer a local sibling checkout of each package (`../bioview-*`,

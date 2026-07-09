@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=BioView Monitor
-Comment=Open Data Acquisition Software for Cross-Platform Device Control
-Exec=/usr/bin/bioview/monitor %f
-Type=Application
-Categories=Development;Engineering;
-Icon=utilities-terminal
-MimeType=application/x-bview; 

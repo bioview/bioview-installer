@@ -6,5 +6,5 @@ Icon=org.bioview.BioView
 Terminal=false
 Type=Application
 Categories=Science;Engineering;Utility;
-MimeType=application/x-bview;
+MimeType=application/x-bvi;
 StartupNotify=true
