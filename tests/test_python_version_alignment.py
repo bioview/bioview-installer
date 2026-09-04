@@ -1,11 +1,8 @@
 """Verify the three BioView packages agree on a single tested Python range.
 
-The macOS installer builds all three packages into one shared virtualenv, so
-their ``requires-python`` constraints must intersect on a real version (they did
-not before: bioview-common allowed 3.14+ while client/server capped at <3.14).
-
-When the sibling package checkouts are not present (e.g. the installer repo is
-built standalone in CI), the relevant checks are skipped rather than failing.
+The macOS installer builds them into one virtualenv, so their
+``requires-python`` constraints must intersect. Skipped when the sibling
+checkouts are absent.
 """
 import tomllib
 from pathlib import Path

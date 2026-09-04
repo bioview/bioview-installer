@@ -1,9 +1,7 @@
-"""Sanity tests for the BioView installer build configuration and assets.
+"""Sanity tests for the installer build configuration and assets.
 
-These guard the specific breakages that caused CI failures: the Flatpak build
-requires ``assets/icon.png`` to exist, and every packaging target must reference
-an icon that is actually present. They also check the Python version alignment
-(Flatpak runtime 24.08 -> Python 3.12) that lets the packages install.
+Every packaging target must reference an icon that exists, and the Flatpak
+runtime's Python version must match what the packages require.
 """
 import sys
 import tomllib

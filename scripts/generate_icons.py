@@ -1,28 +1,9 @@
 #!/usr/bin/env python3
-"""Generate all BioView icon assets from the source SVGs.
+"""Generate the BioView icon assets in ``assets/`` from the source SVGs.
 
-Branding sources (kept alongside the generated output in ``assets/``):
-
-- ``favicon.svg``       the app mark (no text) -> the *application* icon shown in
-                        app launchers, the dock/taskbar, and the app window.
-- ``favicon_text.svg``  the app mark + "BIO VIEW" wordmark -> the *installer*
-                        bundle icon (e.g. the Windows setup .exe).
-
-Outputs (written to ``assets/``):
-
-    icon.png        256x256 app icon (Flatpak desktop entry, Linux hicolor)
-    icon-512.png    512x512 app icon (high-DPI / packaging convenience)
-    icon.ico        multi-size app icon (Windows .exe / PyInstaller)
-    icon.icns       app icon (macOS .app)              [macOS only]
-    installer.png   256x256 installer icon
-    installer.ico   multi-size installer icon (Inno Setup)
-
-Requires ``rsvg-convert`` (librsvg) for SVG rasterization. ``.icns`` generation
-additionally requires ``iconutil`` (macOS). Missing optional tools are skipped
-with a warning rather than failing the whole run.
-
-Usage:
-    python3 scripts/generate_icons.py
+``favicon.svg`` becomes the app icon, ``favicon_text.svg`` the installer icon.
+Requires ``rsvg-convert``; ``.icns`` additionally requires ``iconutil`` (macOS).
+Missing optional tools are skipped with a warning.
 """
 from __future__ import annotations
 

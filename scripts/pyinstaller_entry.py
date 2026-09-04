@@ -1,9 +1,7 @@
-"""Frozen-binary entry point for the BioView bundles.
+"""Frozen-binary entry point: hands off to ``bioview_client.launch:main``.
 
-PyInstaller freezes this script into the single multi-call ``BioView`` binary.
-It simply hands off to the launcher (``bioview_client.launch:main``), which uses
-``--role`` to run the launcher, server, monitor, or configurator. The same binary
-re-execs itself with ``--role server`` to spawn the hidden localhost server.
+That dispatches on ``--role`` (monitor, configurator, or the child server the
+GUI roles spawn by re-execing this same binary).
 """
 import multiprocessing
 import os
