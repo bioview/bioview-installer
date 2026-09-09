@@ -1,8 +1,9 @@
 name: Build BioView Installers
 
-# Builds the three packaging targets on their native OS and attaches them to the
-# GitHub Release. Each builder pulls the three BioView packages (and UHD) per the
-# hybrid strategy described in build.toml / the README.
+# Builds the three packaging targets (.exe, .flatpak, arm64 .dmg) on their native
+# OS and attaches them to the GitHub Release. Each builder pulls the three
+# BioView packages (and UHD) per the hybrid strategy described in
+# build.toml / the README.
 on:
   push:
     tags:
@@ -41,13 +42,8 @@ jobs:
   macos:
     name: macOS (.dmg)
     timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-14   # Apple Silicon (arm64)
-          - runner: macos-13   # Intel (x86_64)
-    runs-on: ${{ matrix.runner }}
+    # Apple Silicon (arm64) only; Intel/x86_64 is no longer built.
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +60,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: bioview-dmg-${{ matrix.runner }}
+          name: bioview-dmg-macos-14
           path: dist/*.dmg
 
   windows:

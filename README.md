@@ -6,7 +6,7 @@ operating system:
 | OS      | Format            | Tooling                          |
 | ------- | ----------------- | -------------------------------- |
 | Linux   | `.flatpak`        | flatpak-builder                  |
-| macOS   | `.dmg`            | PyInstaller + hdiutil            |
+| macOS   | `.dmg` (arm64)    | PyInstaller + hdiutil            |
 | Windows | `.exe` (Setup)    | PyInstaller + Inno Setup         |
 
 Everything is driven by a single config file, [`build.toml`](build.toml), read by
@@ -88,12 +88,13 @@ flatpak build-bundle repo ../dist/BioView.flatpak org.bioview.BioView
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) runs the three
 builders on their native runners when a `v*` tag is pushed and attaches the
-`.flatpak`, `.dmg` (arm64 + x86_64) and `.exe` artifacts to the GitHub Release.
+`.flatpak`, `.dmg` (arm64) and `.exe` artifacts to the GitHub Release. Intel
+(x86_64) macOS is not built.
 
 ## Known limitations
 
 - Bundles are large (Qt + UHD + FPGA images).
-- macOS builds compile UHD 4.10 from source (~10 min per arch) and are unsigned by
+- macOS builds compile UHD 4.10 from source (~10 min) and are unsigned by
   default (Gatekeeper warns) unless an Apple Developer ID is provided via
   `CODESIGN_IDENTITY`; there is no macOS PyPI wheel for UHD.
 - Windows USB USRPs may still need a one-time WinUSB driver (Zadig/UHD installer);
