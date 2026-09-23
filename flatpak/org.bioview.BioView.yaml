@@ -6,7 +6,9 @@
 # self-contained (libuhd + bindings + FPGA images all live under /app).
 #
 # The bioview-client package exposes a `bioview` console script (its launcher),
-# which pip installs to /app/bin/bioview -- that is the app command.
+# which pip installs to /app/bin/bioview -- that is the app command. It is also
+# the whole suite: --role picks the Monitor, the Configurator or the Viewer, and
+# each of the three desktop entries below is that one command plus its role.
 #
 # Build:   flatpak-builder --force-clean --user --install-deps-from=flathub \
 #              build/flatpak org.bioview.BioView.yaml
@@ -96,14 +98,21 @@ modules:
           "darkdetect>=0.7.1,<0.8.0"
           numpy scipy h5py pygame
 
-  # --- The three BioView packages + desktop integration ----------------------
+  # --- The four BioView packages + desktop integration -----------------------
   - name: bioview
     buildsystem: simple
     build-commands:
       - pip3 install --prefix=/app --no-deps ./bioview-common
       - pip3 install --prefix=/app --no-deps ./bioview-server
       - pip3 install --prefix=/app --no-deps ./bioview-client
+      - pip3 install --prefix=/app --no-deps ./bioview-viewer
       - install -Dm644 org.bioview.BioView.desktop /app/share/applications/org.bioview.BioView.desktop
+      # One launcher per role. Flatpak only exports desktop files whose name
+      # starts with the app id, hence the org.bioview.BioView. prefix.
+      - install -Dm644 org.bioview.BioView.Configurator.desktop /app/share/applications/org.bioview.BioView.Configurator.desktop
+      - install -Dm644 org.bioview.BioView.Viewer.desktop /app/share/applications/org.bioview.BioView.Viewer.desktop
+      # The MIME package is the Linux half of the .bvr association.
+      - install -Dm644 org.bioview.BioView.mime.xml /app/share/mime/packages/org.bioview.BioView.xml
       - install -Dm644 org.bioview.BioView.metainfo.xml /app/share/metainfo/org.bioview.BioView.metainfo.xml
       - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/org.bioview.BioView.png
     sources:
@@ -119,8 +128,18 @@ modules:
         url: https://github.com/bioview/bioview-client.git
         tag: v0.9.7.3
         dest: bioview-client
+      - type: git
+        url: https://github.com/bioview/viewer.git
+        tag: v0.9.7.3
+        dest: bioview-viewer
       - type: file
         path: org.bioview.BioView.desktop
+      - type: file
+        path: org.bioview.BioView.Configurator.desktop
+      - type: file
+        path: org.bioview.BioView.Viewer.desktop
+      - type: file
+        path: org.bioview.BioView.mime.xml
       - type: file
         path: org.bioview.BioView.metainfo.xml
       - type: file

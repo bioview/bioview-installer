@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=BioView Configurator
+GenericName=Experiment configuration editor
+Comment=Build and edit BioView experiment configurations
+# The same binary as the Monitor entry, pinned to its Configurator role.
+Exec=bioview --role configurator %f
+Icon=org.bioview.BioView
+Terminal=false
+Categories=Science;Engineering;Utility;
+Keywords=bioview;experiment;configuration;acquisition;
+MimeType=application/x-bvi;
+StartupNotify=true
+StartupWMClass=BioView Configurator

@@ -12,11 +12,38 @@ maintainer = "Aakash Kapoor <ak2247@cornell.edu>"
 homepage = "https://github.com/bioview"
 
 [entry]
-# The frozen binary name and the launcher it dispatches to. The launcher decides,
-# via --role, whether to start the hidden server, the Monitor GUI, or Configurator.
+# The frozen binary name and the launcher it dispatches to. One binary serves the
+# whole suite: --role picks the hidden server, the Monitor, the Configurator or
+# the Viewer. Every shortcut this installer creates is that binary plus a --role.
 binary = "BioView"
 module = "bioview_client.launch"
 func = "main"
+
+# The user-facing apps this one binary provides. `role` is the --role it is
+# launched with; `name` is what the shortcut / menu entry is called.
+[[roles]]
+role = "monitor"
+name = "BioView Monitor"
+description = "Acquire and watch live signals"
+[[roles]]
+role = "configurator"
+name = "BioView Configurator"
+description = "Build and edit experiment configurations"
+[[roles]]
+role = "viewer"
+name = "BioView Viewer"
+description = "View and analyse recorded .bvr files"
+
+[document]
+# The recording type the suite owns. Opening one launches the binary in its
+# Viewer role: macOS learns this from the Info.plist written by
+# scripts/write_doc_types.py, Windows from the registry keys in
+# windows/setup.iss, and Linux from flatpak/org.bioview.BioView.mime.xml.
+extension = "bvr"
+uti = "org.bioview.bvr"
+mime = "application/x-bioview-recording"
+description = "BioView recording"
+role = "viewer"
 
 [uhd]
 # Hybrid UHD delivery: this single version is obtained per-platform at build time
@@ -26,7 +53,7 @@ version = "4.10.0.0"
 git = "https://github.com/EttusResearch/uhd.git"
 ref = "v4.10.0.0"
 
-# BioView is three separate packages. The builders prefer a local sibling checkout
+# BioView is four separate packages. The builders prefer a local sibling checkout
 # (great for development from this monorepo) and fall back to a shallow git clone
 # of the pinned ref when the local path is absent (e.g. clean CI runners).
 [[packages]]
@@ -46,6 +73,14 @@ name = "bioview-client"
 git = "https://github.com/bioview/bioview-client.git"
 ref = "v0.9.7.3"
 local = "../bioview-client"
+
+# The Viewer is its own package and its own window, but not its own installer:
+# it is frozen into the same binary and reached with `--role viewer`.
+[[packages]]
+name = "bioview-viewer"
+git = "https://github.com/bioview/viewer.git"
+ref = "v0.9.7.3"
+local = "../bioview-viewer"
 
 [assets]
 # App icon (favicon.svg, no wordmark): used for the .app / .exe / Flatpak app and

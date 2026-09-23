@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Build the macOS BioView.app and package it into a .dmg.
 #
+# One bundle, three windows: the frozen binary dispatches on --role to the
+# Monitor, the Configurator or the Viewer, so this .dmg installs the whole suite.
+#
 # Hybrid UHD: build libuhd + Python API from source (PyPI has no macOS wheel).
 # Homebrew Boost/libusb supply native deps; PyInstaller collects the uhd package
 # and bundled dylibs plus FPGA images.
@@ -96,8 +99,16 @@ if ! python -c "import uhd" >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! python -c "import bioview_viewer" >/dev/null 2>&1; then
+    echo "ERROR: bioview_viewer not importable; the Viewer role would be dead" >&2
+    exit 1
+fi
+
 echo "=== Running PyInstaller ==="
-pyinstaller --noconfirm --clean --windowed \
+# --argv-emulation turns the Finder's open-document event into argv before
+# Python starts, which is what lets the launcher see a .bvr path early enough to
+# choose the Viewer role for it.
+pyinstaller --noconfirm --clean --windowed --argv-emulation \
     --name "$APP_NAME" \
     --distpath "$BUILD_DIR/pyinstaller_dist" \
     --workpath "$BUILD_DIR/pyinstaller_work" \
@@ -112,6 +123,13 @@ pyinstaller --noconfirm --clean --windowed \
     --collect-submodules bioview_server \
     --collect-submodules bioview_client \
     --collect-data bioview_client \
+    --collect-submodules bioview_viewer \
+    --collect-data bioview_viewer \
+    --hidden-import qtawesome \
+    --hidden-import qdarktheme \
+    --hidden-import scipy.signal \
+    --hidden-import scipy.ndimage \
+    --hidden-import scipy.special \
     ${ADD_DATA[@]+"${ADD_DATA[@]}"} \
     "$HERE/pyinstaller_entry.py"
 
@@ -121,7 +139,20 @@ if [ ! -d "$APP_BUNDLE" ]; then
     exit 1
 fi
 
-# --- 4. Ad-hoc sign (real Developer ID signing happens in CI if configured) ---
+# --- 4. Document types (the .bvr association, opened with --role viewer) ------
+python3 "$HERE/write_doc_types.py" "$APP_BUNDLE"
+
+# A silently-dropped Info.plist key is the difference between double-clicking a
+# recording and being told macOS cannot open it, so fail the build over it.
+DOC_EXT="$(python3 "$HERE/buildcfg.py" get document.extension)"
+PLIST="$APP_BUNDLE/Contents/Info.plist"
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:CFBundleTypeExtensions:0" "$PLIST" 2>/dev/null | grep -qx "$DOC_EXT"; then
+    echo "ERROR: the .$DOC_EXT document type is missing from $PLIST" >&2
+    exit 1
+fi
+echo "Registered document type: .$DOC_EXT"
+
+# --- 5. Ad-hoc sign (real Developer ID signing happens in CI if configured) ---
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
     echo "=== Signing with $CODESIGN_IDENTITY ==="
     codesign --deep --force --options runtime --sign "$CODESIGN_IDENTITY" "$APP_BUNDLE"
@@ -130,7 +161,7 @@ else
     codesign --deep --force --sign - "$APP_BUNDLE" || true
 fi
 
-# --- 5. DMG ---------------------------------------------------------------
+# --- 6. DMG ---------------------------------------------------------------
 DMG_PATH="$DIST_DIR/${APP_NAME}-${APP_VERSION}-${ARCH}.dmg"
 STAGE="$BUILD_DIR/dmg"
 rm -rf "$STAGE" "$DMG_PATH"
@@ -143,3 +174,8 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG_P
 rm -rf "$STAGE"
 
 echo "=== SUCCESS: $DMG_PATH ==="
+echo
+echo "The bundle installs the whole suite; the Viewer is reached with"
+echo "  open -a \"$APP_NAME\" --args --role viewer"
+echo "or by double-clicking a .$DOC_EXT recording once Launch Services has seen the app:"
+echo "  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f \"/Applications/$APP_NAME.app\""

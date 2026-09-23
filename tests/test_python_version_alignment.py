@@ -1,4 +1,4 @@
-"""Verify the three BioView packages agree on a single tested Python range.
+"""Verify the four BioView packages agree on a single tested Python range.
 
 The macOS installer builds them into one virtualenv, so their
 ``requires-python`` constraints must intersect. Skipped when the sibling
@@ -12,7 +12,7 @@ import pytest
 INSTALLER_DIR = Path(__file__).resolve().parent.parent
 MONOREPO_ROOT = INSTALLER_DIR.parent
 
-PACKAGES = ["bioview-common", "bioview-server", "bioview-client"]
+PACKAGES = ["bioview-common", "bioview-server", "bioview-client", "bioview-viewer"]
 
 
 def _requires_python(pkg: str):

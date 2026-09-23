@@ -4,6 +4,7 @@
 Usage:
     buildcfg.py get app.version          -> prints a single value
     buildcfg.py packages                 -> prints "name|git|ref|local" per package
+    buildcfg.py roles                    -> prints "role|name|description" per role
 """
 import sys
 from pathlib import Path
@@ -38,9 +39,18 @@ def packages() -> None:
         ))
 
 
+def roles() -> None:
+    for role in load().get("roles", []):
+        print("{role}|{name}|{description}".format(
+            role=role.get("role", ""),
+            name=role.get("name", ""),
+            description=role.get("description", ""),
+        ))
+
+
 def main(argv) -> int:
     if not argv:
-        print("usage: buildcfg.py get <dotted.key> | packages", file=sys.stderr)
+        print("usage: buildcfg.py get <dotted.key> | packages | roles", file=sys.stderr)
         return 2
 
     cmd = argv[0]
@@ -49,6 +59,9 @@ def main(argv) -> int:
         return 0
     if cmd == "packages":
         packages()
+        return 0
+    if cmd == "roles":
+        roles()
         return 0
 
     print(f"unknown command: {argv}", file=sys.stderr)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Acquire the three BioView packages and install them (plus deps + PyInstaller)
+# Acquire the four BioView packages and install them (plus deps + PyInstaller)
 # into a fresh virtualenv. Used by the macOS PyInstaller build. The Flatpak build
 # does NOT use this -- it builds its own environment inside the sandbox.
 #
@@ -48,10 +48,12 @@ source "$VENV/bin/activate"
 
 python -m pip install --upgrade pip wheel pyinstaller
 
-echo "=== Installing BioView packages (common -> server -> client) ==="
+echo "=== Installing BioView packages (common -> server -> client -> viewer) ==="
 pip install "$SRC_DIR/bioview-common"
 pip install "$SRC_DIR/bioview-server"
 pip install "$SRC_DIR/bioview-client"
+# The Viewer is the third window of the one frozen binary (`--role viewer`).
+pip install "$SRC_DIR/bioview-viewer"
 
 if [ "${WITH_UHD_SOURCE:-0}" = "1" ]; then
     echo "=== Preparing UHD build deps ==="

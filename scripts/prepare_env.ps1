@@ -1,4 +1,4 @@
-# Acquire the three BioView packages and install them (plus deps + PyInstaller +
+# Acquire the four BioView packages and install them (plus deps + PyInstaller +
 # uhd) into a fresh virtualenv for the Windows PyInstaller build.
 #
 # Usage: prepare_env.ps1 -BuildDir <dir> [-PythonBin python]
@@ -49,10 +49,12 @@ Write-Host "=== Pinning scientific stack (numpy<2 for uhd + PyInstaller) ===" -F
     "scipy>=1.16.1,<2.0.0" `
     "h5py>=3.14.0,<4.0.0"
 
-Write-Host "=== Installing BioView packages (common -> server -> client) ===" -ForegroundColor Cyan
+Write-Host "=== Installing BioView packages (common -> server -> client -> viewer) ===" -ForegroundColor Cyan
 & $Py -m pip install (Join-Path $SrcDir "bioview-common")
 & $Py -m pip install (Join-Path $SrcDir "bioview-server")
 & $Py -m pip install (Join-Path $SrcDir "bioview-client")
+# The Viewer is the third window of the one frozen binary (`--role viewer`).
+& $Py -m pip install (Join-Path $SrcDir "bioview-viewer")
 
 $UhdVersion = (& $PythonBin "$Here\buildcfg.py" get uhd.version).Trim()
 Write-Host "=== Installing uhd==$UhdVersion from PyPI ===" -ForegroundColor Cyan

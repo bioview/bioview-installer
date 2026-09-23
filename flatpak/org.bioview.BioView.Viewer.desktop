@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=BioView Viewer
+GenericName=Biosignal recording viewer
+Comment=View and analyse BioView .bvr recordings
+# The same binary as the Monitor entry, pinned to its Viewer role. %f and the
+# MimeType below are together what make a double-clicked .bvr open here.
+Exec=bioview --role viewer %f
+Icon=org.bioview.BioView
+Terminal=false
+Categories=Science;Engineering;Education;
+Keywords=bioview;biosignal;recording;bvr;plot;
+MimeType=application/x-bioview-recording;
+StartupNotify=true
+StartupWMClass=BioView Viewer

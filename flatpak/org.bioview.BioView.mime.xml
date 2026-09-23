@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The freedesktop MIME definition for a BioView recording. Installed to
+  share/mime/packages/, it teaches the file manager that .bvr is a type of its
+  own (so it gets the BioView icon), and the magic rule lets it recognise one
+  even when the extension is missing or wrong.
+
+  This is the Linux half of the .bvr association; macOS gets it from the
+  Info.plist that scripts/write_doc_types.py writes, and Windows from the
+  registry keys in windows/setup.iss.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-bioview-recording">
+    <comment>BioView recording</comment>
+    <glob pattern="*.bvr"/>
+    <magic priority="60">
+      <match type="string" value="BVR3" offset="0"/>
+    </magic>
+    <icon name="org.bioview.BioView"/>
+  </mime-type>
+</mime-info>
